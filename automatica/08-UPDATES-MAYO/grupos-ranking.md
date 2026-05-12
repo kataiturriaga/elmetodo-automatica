@@ -17,7 +17,7 @@ Esto también es el prerequisito para que la **pantalla de bloqueo post-cancelac
 ### Propuesta
 
 - Puntuación = **pasos + entrenos (puntuacion a definir)**
-- Peso exacto de cada componente a definir con el equipo 
+- Peso exacto de cada componente a definir con el equipo
 
 ---
 
@@ -62,7 +62,7 @@ Inspirado en el modelo de ligas de Duolingo.
 
 ## 4. Segmentación
 
-**¿Un grupo por programa o varios segmentos?**
+**a¿Un grupo por programa o varios segmentos?**
 
 Segmentar por **género y edad**.
 
