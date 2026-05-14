@@ -1,3 +1,0 @@
-- Rediseño completo app asesorias
-- Wearables
-- Lista de la compra
