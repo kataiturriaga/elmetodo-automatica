@@ -72,15 +72,26 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 - [ ] **Recálculo**: tarea Celery (batch diario) y/o trigger al completar entreno / registrar peso. Persistir snapshot (sección 2).
 - [ ] Tests unitarios de fórmulas (Epley, fuerza relativa, paces, ponderaciones, promedios con grupos vacíos) — sin mocks de DB en integración (convención del repo).
 
-## 6. API — Endpoints (mobile)
+## 6. Sesiones de evaluación — solución cold-start
+
+> Ver [vision-producto-puntuaciones.md](vision-producto-puntuaciones.md) §5. Lo que hace que el score se pueble dentro del trial.
+
+- [ ] **Diseñar el bloque de evaluación de fuerza** (contenido): 1–2 sesiones iniciales que incluyan ≥1 ejercicio válido por cada uno de los 7 grupos musculares, con **series de trabajo submáximas** (no 1RM a fallo). Insertarlo al inicio de los programas de fuerza del MVP.
+- [ ] **Test ligero de running de inicio** (contenido): proxy corto escalado al nivel del programa (time-trial 1–2 km o test 12 min) que dé un pace de arranque. El Test completo del spec se mantiene al final.
+- [ ] **Flag de "sesión de evaluación"** en `training_day_v2` (o ejercicio) que marque qué sesiones cuentan como baseline. Alinear con el tipo de sesión "Test" del running.
+- [ ] **Empty state de onboarding** en el tab Puntuaciones: antes de completar la evaluación, mostrar "Completa tu sesión de evaluación para ver tu nivel" en vez de score en cero.
+- [ ] Medir **time-to-first-score** como métrica secundaria (ver visión §2).
+
+## 7. API — Endpoints (mobile)
 
 - [ ] `GET /score` (o dentro de training): Score Total + sub-scores + desglose + nota de cobertura + nivel.
 - [ ] `GET /score/history` con ventanas 1 mes / 6 meses / 1 año / Todo.
 - [ ] Schemas Pydantic (mismo patrón que `app/schemas/marcas.py`).
 - [ ] Tests de integración (DB real, auth real, header `X-Client-ID`).
 
-## 7. App Flutter (`lib/features/...`)
+## 8. App Flutter (`lib/features/...`)
 
+- [ ] **Dos tabs en la pantalla de Entreno**: *Programa* (lo actual) y *Puntuaciones* (este feature). El tab Puntuaciones aloja score + desgloses + historial.
 - [ ] Capa data/domain (Freezed models + provider Riverpod) consumiendo los endpoints de score.
 - [ ] **Pantalla principal**: Score Total con `*` y nota de cobertura + nivel.
 - [ ] **Historial**: 1 mes / 6 meses / 1 año / Todo (gráfica — reutilizar el chart de marcas si encaja).
@@ -90,10 +101,10 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 - [ ] Estados vacíos / baja confianza / "aún no hay datos suficientes".
 - [ ] Strings en `l10n` (`app_localizations_es/en`).
 
-## 8. Integración con Ligas (opcional, decisión de producto)
+## 9. Integración con Ligas (opcional, decisión de producto)
 
 - [ ] Decidir si el **score de entreno alimenta el ranking** (hoy es por pasos en `RankingGroup`) o vive como vista propia. Si alimenta ligas: definir métrica de ranking (score absoluto vs velocidad de progreso) y ajustar el job de asignación de grupos.
 
-## 9. Diseño (Figma)
+## 10. Diseño (Figma)
 
 - [ ] Specs de pantalla principal, historial, desgloses y resumen semanal (loop Figma del repo: execute → screenshot → iterar).
