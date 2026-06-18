@@ -29,7 +29,7 @@ Cuando el usuario cierra el paywall (pulsando un botón nuevo **"De momento no"*
 | Backend: registrar producto nuevo | ✅ Hecho (1 cambio, **SIN commit**) |
 | Producto iOS en App Store Connect | ✅ Creado y **enviado a revisión** de Apple ⏳ |
 | Oferta Android en Google Play | ✅ **Creada y activada** (eligibility: Developer determined) |
-| Pedir llave `.p8` a Carles | ⏳ **Pendiente** (solo para la 2ª vía) |
+| Llave `.p8` | ✅ Colocada en `elmetodo_api/secrets/` (git la ignora). Es la del servidor (la pasó Carles) → config OK |
 | Flutter: botón + modal + compra | 🔜 **No empezado** |
 | Backend: endpoint de firma (2ª vía) | 🔜 **No empezado** |
 | Android / Google Play | 🆕 **Añadido al scope 2026-06-16** (ver sección 11) |
@@ -132,7 +132,7 @@ Cuando el usuario cierra el paywall (pulsando un botón nuevo **"De momento no"*
 - Manejo de `offerType` de Apple: `app/services/apple_store_service.py` (línea ~220)
 - Variables de entorno Apple ya configuradas: `app/config/settings.py` (líneas ~156-160): `APPLE_IAP_KEY_ID`, `APPLE_IAP_ISSUER_ID`, `APPLE_IAP_PRIVATE_KEY_PATH` (por defecto `secrets/apple_iap_key.p8`), `APPLE_IAP_ENVIRONMENT` (sandbox/production)
 - Campo en BD: `app/models/user.py` → `has_ever_subscribed` (línea ~123)
-- ⚠️ La llave `secrets/apple_iap_key.p8` **NO está en el ordenador de Kata** (probablemente solo en el servidor). Pedirla a Carles para poder probar la 2ª vía.
+- ✅ La llave `.p8` está colocada en `elmetodo_api/secrets/apple_iap_key.p8` (git la ignora). Es la misma que el servidor (la pasó Carles) → `APPLE_IAP_KEY_ID` ya coincide, sin cambios.
 
 **Flutter (`elmetodo_app`) — ficheros relevantes:**
 - Paywall: `lib/features/subscription/presentation/screens/paywall_screen.dart` (el cierre es un `CircularBackButton` con `context.pop()`, línea ~122)
@@ -211,5 +211,5 @@ Cuando el usuario cierra el paywall (pulsando un botón nuevo **"De momento no"*
 - **Product ID:** `elmetodo_subscription_trimestraloffer` → ya mapeado en el backend (→ quarterly), junto al de iOS, en la misma rama.
 - Plan base: 3 meses, **19,99€** (precio normal). Oferta encima: **9,99€ el primer ciclo** (pago único), luego vuelve a 19,99€.
 - **Eligibility: Developer determined** (la app decide quién la ve). → Probablemente esta misma oferta sirva para **nuevos Y para los que ya pagaron** en Android (a confirmar al programar).
-- **Base plan ID:** _(pendiente de que Kata lo pase)_ · **Offer ID:** `exit-intent` _(a confirmar)_
+- **Base plan ID:** `trimestral` · **Offer ID:** `exit-intent` ✅ (los 3 IDs que necesita Flutter para Android: producto `elmetodo_subscription_trimestraloffer` + base plan `trimestral` + oferta `exit-intent`)
 - Falta en Flutter: manejo del *offer token* (`GooglePlayPurchaseParam`).

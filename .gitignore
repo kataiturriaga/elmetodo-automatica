@@ -7,3 +7,5 @@
 /Z.System/
 /tareas.md
 /asesorias/negociacion-bonus.md
+# Nunca subir llaves privadas (.p8)
+*.p8

@@ -11,8 +11,8 @@
 
 - **Tiendas:** producto iOS **enviado a revisión** de Apple ⏳ · oferta Android **creada y activada** ✅
 - **Backend:** rama `feature/exit-intent-pricing` creada; productos de oferta (iOS + Android) registrados en `PRODUCT_TIER_MAP`. **Sin commit** (pendiente revisión de Carles).
-- **Llave `.p8`** (solo iOS "ya pagaron"): **pedida a Carles** ⏳.
-- **Pendiente Kata:** pasar el **Base plan ID** y el **Offer ID** (`exit-intent`) de Google Play.
+- **Llave `.p8`**: ✅ **colocada** en `elmetodo_api/secrets/apple_iap_key.p8` (git la ignora). Es la **misma que el servidor** (la pasó Carles) → `APPLE_IAP_KEY_ID` ya coincide, no hay que tocar config. ✅
+- **IDs Google Play (completos):** producto `elmetodo_subscription_trimestraloffer` · base plan `trimestral` · oferta `exit-intent`.
 - **Siguiente:** Flutter (botón "De momento no" + modal + compras), iOS y Android.
 
 ---
@@ -65,9 +65,9 @@ Lo de las tiendas tarda en aprobarse, así que se empieza primero aunque no haya
   - Añadirle una **Introductory Offer** tipo *Pay up front* = **9,99€ los 3 primeros meses**
   - Enviar a revisión (Apple lo tiene que aprobar → ⏳ puede tardar). 🟡
   - *Lo hace Kata / quien tenga acceso a App Store Connect.*
-- [x] **Oferta Android creada y ACTIVADA en Google Play** ✅ — Product ID `elmetodo_subscription_trimestraloffer`, plan base 3 meses a **19,99€**, oferta **9,99€ primer ciclo** (pago único), eligibility **Developer determined**. ⏳ Falta que Kata pase el **Base plan ID** y el **Offer ID** (`exit-intent`).
+- [x] **Oferta Android creada y ACTIVADA en Google Play** ✅ — Product ID `elmetodo_subscription_trimestraloffer`, base plan ID `trimestral` (3 meses a **19,99€**), oferta ID `exit-intent` (**9,99€ primer ciclo**, pago único), eligibility **Developer determined**.
 - [x] **Precio normal del trimestral: 19,99€** (confirmado por Kata). 9,99€ = 50% real → copy honesto.
-- [~] **Llave `.p8` de Apple** (solo para la vía iOS de "ya pagaron"): **ya pedida a Carles** ⏳. Recordar: una `.p8` solo se descarga una vez → mejor recuperar la que el backend ya usa, no crear una nueva. *No bloquea el resto.*
+- [x] **Llave `.p8` colocada** en `elmetodo_api/secrets/apple_iap_key.p8` ✅ (git la ignora, no se sube). Es la **misma que el servidor** (la pasó Carles) → `APPLE_IAP_KEY_ID` ya coincide, sin cambios. *Solo afecta a la vía iOS de "ya pagaron".*
 - [x] **Gesto disparador (decidido):** se añade un **botón "De momento no"** explícito en el paywall (Flutter). Al pulsarlo se evalúa `has_ever_subscribed` y se muestra el modal que corresponda.
 
 ---

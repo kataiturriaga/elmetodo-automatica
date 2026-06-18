@@ -30,13 +30,15 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 
 ## 1. Definiciones previas (bloqueantes)
 
+> 📋 **Auditoría de datos reales hecha (18-jun-2026)** → ver [auditoria-datos-reales.md](../puntuaciones-entreno/auditoria-datos-reales.md). Resuelve casi todos estos puntos; abajo el estado actualizado.
+
 - [ ] **Tablas de estándares de fuerza** (fuerza relativa → score 0–300+) por grupo muscular × género × edad. **No existe — input más crítico.** Definir fuente (Symmetric Strength, Gravl, tabla propia).
-- [ ] **Tabla de estándares de running** (pace → score) por género, edad y distancia de referencia (VDOT-like). **No existe.**
-- [ ] **Auditar `exercise.muscle_group` y `exercise.equipment` reales en la DB** vs los 7 grupos y la lista de ejercicios válidos del spec. Decidir si se normalizan los valores o se crea una tabla de mapeo aparte.
-- [ ] Definir el **flag "válido para score"** (barra/mancuerna sí, máquina no) — derivar de `equipment` o añadir columna explícita en `exercises`.
-- [ ] **Derivar el tipo de programa** (Fuerza / Running / Híbrido): `Program` **no tiene campo tipo**. Decidir si se infiere de `objective`/`sub_objective`/`tags`/`category` de fases, o se añade columna `program.score_type` + pesos Fuerza/Running.
-- [ ] Definir **reglas de clasificación de sesión de running** desde `plan_type`/`log_type`/duración/zona (Test, Series Largas Z4, Umbral Z3, Z2, Strides). Confirmar de dónde sale la "zona" (¿`category`? ¿naming? ¿campo nuevo?).
-- [ ] Confirmar fiabilidad del **texto-libre en `logged_value`**: `parse_numeric` ya tolera "50kg"/"15:30"/"2.5km", pero validar % de logs no parseables en datos reales.
+- [ ] **Tabla de estándares de running** (pace → score) por género, edad y distancia de referencia (VDOT-like). **No existe.** ⚠️ Auditoría: no hay data de running en el dump de test → calibrar con sesiones reales de los programas Runner de prod.
+- [x] **Auditar `exercise.muscle_group` y `exercise.equipment`** → HECHO. `muscle_group` **inservible** (valores burdos `Chest/Legs/Back/Arms` + ~30% IDs legacy Firebase; no separa cuádriceps/isquio ni bíceps/tríceps). `category` es mejor base pero bilingüe sucio y no separa pierna. **Los nombres de ejercicio del spec no existen literales** → mapear por ID real. Conclusión: **se necesita tabla de curación manual ejercicio→grupo** (no normalización automática). [detalle](../puntuaciones-entreno/auditoria-datos-reales.md#1-grupos-musculares--muscle_group-es-inservible-category-es-la-mejor-base)
+- [x] **Flag "válido para score"** → DECIDIDO: `equipment` **no sirve** (vacío en los lifts core: Sentadilla/Peso muerto/Curl; no existe valor "Machine"). → Añadir columna explícita **`valid_for_score`** curada a mano, no derivar de `equipment`. [detalle](../puntuaciones-entreno/auditoria-datos-reales.md#2-equipment-no-sirve-para-filtrar-máquinas)
+- [x] **Tipo de programa** → DECIDIDO: `Program` no tiene columna tipo (confirmado), pero se deriva del **`objective`** (`Fisico/Salud`=fuerza, `Atleta`=híbrido 50/50, `Carrera`=running). Implementar como **tabla de mapeo objetivo→score_type+pesos**, no columna nueva. Pendiente: confirmar si existe "Carrera con fuerza" (20/80). [detalle](../puntuaciones-entreno/auditoria-datos-reales.md#4-tipo-de-programa--derivable-de-objective-sin-columna-nueva-o-con-una-pequeña)
+- [~] **Clasificación de sesión de running** → PARCIAL: el modelo `plan_type`/`log_type` con `distance`/`time` **sí existe** en código (`marca_value.py`), + un tercer tipo `time_distance` no documentado. **Pero las zonas (Z2/Z3/Z4) NO tienen campo** (`category` 96% NULL) → inferir por naming de sesión o flag nuevo. Bloqueante de running que sigue abierto. [detalle](../puntuaciones-entreno/auditoria-datos-reales.md#5-running--el-modelo-del-spec-sí-es-real-con-un-matiz)
+- [x] **Texto-libre en `logged_value`** → CONFIRMADO viable: `marca_value.py` parsea robusto kg / mm:ss / km→m / reps. Pendiente solo medir % no parseable en logs reales.
 
 ## 2. Modelo de datos (API)
 
