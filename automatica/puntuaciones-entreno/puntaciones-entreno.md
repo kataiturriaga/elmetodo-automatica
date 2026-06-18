@@ -36,8 +36,9 @@ Solo se consideran ejercicios con barra o mancuerna (no máquinas — varían en
 
 **Paso 4 — Score total**
 ```
-score_total = promedio(grupos_con_datos)
+score_total = mediana(grupos_con_datos)
 ```
+> Actualizado 18-jun-2026: **mediana** (no promedio), igual que Gravl. Ver [estandares-fuerza.md](estandares-fuerza.md).
 Si algún grupo no tiene datos → muestra `—` en el desglose, no entra al cálculo.
 El score total lleva un `*` si hay grupos sin datos, con nota: "basado en X de 7 grupos musculares".
 

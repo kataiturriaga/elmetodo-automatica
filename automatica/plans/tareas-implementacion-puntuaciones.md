@@ -4,6 +4,8 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 
 **Alcance**: solo **app automática** (sin coaches, sin dashboard). Toda la info es visible para el usuario final.
 
+**Decisión MVP (18-jun-2026)**: el MVP arranca **solo con Score de Fuerza**. Running (§4) y híbrido (§5) → **fase 2** (no hay data de running para calibrar ni zonas estructuradas — ver [auditoría §5](../puntuaciones-entreno/auditoria-datos-reales.md#5-running--el-modelo-del-spec-sí-es-real-con-un-matiz)). Catálogo de fuerza curado en [curacion-ejercicios-fuerza.md](../puntuaciones-entreno/curacion-ejercicios-fuerza.md).
+
 **Stack real**:
 - **API** `elmetodo_api`: FastAPI · SQLAlchemy 2.x · Alembic (forward-only) · Celery + Redis · Postgres. Capas: routes → services → repositories.
 - **App** `elmetodo_app`: Flutter · Riverpod · Freezed. Carpetas `lib/features/{training,ranking}/{data,domain,presentation}`.
@@ -32,9 +34,10 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 
 > 📋 **Auditoría de datos reales hecha (18-jun-2026)** → ver [auditoria-datos-reales.md](../puntuaciones-entreno/auditoria-datos-reales.md). Resuelve casi todos estos puntos; abajo el estado actualizado.
 
-- [ ] **Tablas de estándares de fuerza** (fuerza relativa → score 0–300+) por grupo muscular × género × edad. **No existe — input más crítico.** Definir fuente (Symmetric Strength, Gravl, tabla propia).
+- [x] **Tablas de estándares de fuerza** (fuerza relativa → score 0–300+) por grupo × género × edad → HECHO (v1): construidas sobre ratios reales de **StrengthLevel** (Gravl no publica los suyos), calibración **motivadora**, ajuste de edad incluido. Ver [estandares-fuerza.md](../puntuaciones-entreno/estandares-fuerza.md). Pendiente: validar contra datos reales + decisión media vs **mediana** para el total.
 - [ ] **Tabla de estándares de running** (pace → score) por género, edad y distancia de referencia (VDOT-like). **No existe.** ⚠️ Auditoría: no hay data de running en el dump de test → calibrar con sesiones reales de los programas Runner de prod.
 - [x] **Auditar `exercise.muscle_group` y `exercise.equipment`** → HECHO. `muscle_group` **inservible** (valores burdos `Chest/Legs/Back/Arms` + ~30% IDs legacy Firebase; no separa cuádriceps/isquio ni bíceps/tríceps). `category` es mejor base pero bilingüe sucio y no separa pierna. **Los nombres de ejercicio del spec no existen literales** → mapear por ID real. Conclusión: **se necesita tabla de curación manual ejercicio→grupo** (no normalización automática). [detalle](../puntuaciones-entreno/auditoria-datos-reales.md#1-grupos-musculares--muscle_group-es-inservible-category-es-la-mejor-base)
+- [x] **Catálogo curado de fuerza** → HECHO: de los 26 ejercicios del spec, **20 ya existen en la BD** (decisión Kata: no crear los 6 que faltan) → marcados `valid_for_score` + grupo canónico, con 7 compuestos principales como anclas. Ver [curacion-ejercicios-fuerza.md](../puntuaciones-entreno/curacion-ejercicios-fuerza.md).
 - [x] **Flag "válido para score"** → DECIDIDO: `equipment` **no sirve** (vacío en los lifts core: Sentadilla/Peso muerto/Curl; no existe valor "Machine"). → Añadir columna explícita **`valid_for_score`** curada a mano, no derivar de `equipment`. [detalle](../puntuaciones-entreno/auditoria-datos-reales.md#2-equipment-no-sirve-para-filtrar-máquinas)
 - [x] **Tipo de programa** → DECIDIDO: `Program` no tiene columna tipo (confirmado), pero se deriva del **`objective`** (`Fisico/Salud`=fuerza, `Atleta`=híbrido 50/50, `Carrera`=running). Implementar como **tabla de mapeo objetivo→score_type+pesos**, no columna nueva. Pendiente: confirmar si existe "Carrera con fuerza" (20/80). [detalle](../puntuaciones-entreno/auditoria-datos-reales.md#4-tipo-de-programa--derivable-de-objective-sin-columna-nueva-o-con-una-pequeña)
 - [~] **Clasificación de sesión de running** → PARCIAL: el modelo `plan_type`/`log_type` con `distance`/`time` **sí existe** en código (`marca_value.py`), + un tercer tipo `time_distance` no documentado. **Pero las zonas (Z2/Z3/Z4) NO tienen campo** (`category` 96% NULL) → inferir por naming de sesión o flag nuevo. Bloqueante de running que sigue abierto. [detalle](../puntuaciones-entreno/auditoria-datos-reales.md#5-running--el-modelo-del-spec-sí-es-real-con-un-matiz)
@@ -54,7 +57,7 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 - [ ] **Emparejar peso corporal por fecha** del registro contra `Progress.weight` (fallback a `Questionnaire.weight` si no hay histórico).
 - [ ] **Fuerza relativa** = 1RM / peso_corporal.
 - [ ] **Score por grupo muscular** = lookup estándar con `max(fuerza_relativa)` del grupo, ajustado por género y edad.
-- [ ] **Score total fuerza** = promedio de grupos con datos; grupos sin datos → `—`, fuera del promedio.
+- [ ] **Score total fuerza** = **mediana** de grupos con datos (decisión 18-jun, igual que Gravl); grupos sin datos → `—`, fuera del cálculo.
 - [ ] `*` + nota *"basado en X de 7 grupos musculares"* cuando faltan grupos.
 - [ ] Filtrar ejercicios de **máquina** y los no mapeados a grupo.
 - [ ] Mapear score → **nivel** (Principiante → Olímpico).
