@@ -4,7 +4,7 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 
 **Alcance**: solo **app automática** (sin coaches, sin dashboard). Toda la info es visible para el usuario final.
 
-**Decisión MVP (18-jun-2026)**: el MVP arranca **solo con Score de Fuerza**. Running (§4) y híbrido (§5) → **fase 2** (no hay data de running para calibrar ni zonas estructuradas — ver [auditoría §5](../puntuaciones-entreno/auditoria-datos-reales.md#5-running--el-modelo-del-spec-sí-es-real-con-un-matiz)). Catálogo de fuerza curado en [curacion-ejercicios-fuerza.md](../puntuaciones-entreno/curacion-ejercicios-fuerza.md).
+**Decisión MVP (18-jun-2026)**: el MVP arranca **solo con Score de Fuerza**. Running (§4) y híbrido (§5) → **fase 2** (no hay data de running para calibrar ni zonas estructuradas — ver [auditoría §5](../../archived/auditoria-datos-reales.md#5-running--el-modelo-del-spec-sí-es-real-con-un-matiz)). Catálogo de fuerza curado en [curacion-ejercicios-fuerza.md](../puntuaciones-entreno/curacion-ejercicios-fuerza.md).
 
 **Stack real**:
 - **API** `elmetodo_api`: FastAPI · SQLAlchemy 2.x · Alembic (forward-only) · Celery + Redis · Postgres. Capas: routes → services → repositories.
@@ -32,23 +32,32 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 
 ## 1. Definiciones previas (bloqueantes)
 
-> 📋 **Auditoría de datos reales hecha (18-jun-2026)** → ver [auditoria-datos-reales.md](../puntuaciones-entreno/auditoria-datos-reales.md). Resuelve casi todos estos puntos; abajo el estado actualizado.
+> 📋 **Auditoría de datos reales hecha (18-jun-2026)** → ver [auditoria-datos-reales.md](../../archived/auditoria-datos-reales.md). Resuelve casi todos estos puntos; abajo el estado actualizado.
 
 - [x] **Tablas de estándares de fuerza** (fuerza relativa → score 0–300+) por grupo × género × edad → HECHO (v1): construidas sobre ratios reales de **StrengthLevel** (Gravl no publica los suyos), calibración **motivadora**, ajuste de edad incluido. Ver [estandares-fuerza.md](../puntuaciones-entreno/estandares-fuerza.md). Pendiente: validar contra datos reales + decisión media vs **mediana** para el total.
 - [ ] **Tabla de estándares de running** (pace → score) por género, edad y distancia de referencia (VDOT-like). **No existe.** ⚠️ Auditoría: no hay data de running en el dump de test → calibrar con sesiones reales de los programas Runner de prod.
-- [x] **Auditar `exercise.muscle_group` y `exercise.equipment`** → HECHO. `muscle_group` **inservible** (valores burdos `Chest/Legs/Back/Arms` + ~30% IDs legacy Firebase; no separa cuádriceps/isquio ni bíceps/tríceps). `category` es mejor base pero bilingüe sucio y no separa pierna. **Los nombres de ejercicio del spec no existen literales** → mapear por ID real. Conclusión: **se necesita tabla de curación manual ejercicio→grupo** (no normalización automática). [detalle](../puntuaciones-entreno/auditoria-datos-reales.md#1-grupos-musculares--muscle_group-es-inservible-category-es-la-mejor-base)
-- [x] **Catálogo curado de fuerza** → HECHO: de los 26 ejercicios del spec, **20 ya existen en la BD** (decisión Kata: no crear los 6 que faltan) → marcados `valid_for_score` + grupo canónico, con 7 compuestos principales como anclas. Ver [curacion-ejercicios-fuerza.md](../puntuaciones-entreno/curacion-ejercicios-fuerza.md).
-- [x] **Flag "válido para score"** → DECIDIDO: `equipment` **no sirve** (vacío en los lifts core: Sentadilla/Peso muerto/Curl; no existe valor "Machine"). → Añadir columna explícita **`valid_for_score`** curada a mano, no derivar de `equipment`. [detalle](../puntuaciones-entreno/auditoria-datos-reales.md#2-equipment-no-sirve-para-filtrar-máquinas)
-- [x] **Tipo de programa** → DECIDIDO: `Program` no tiene columna tipo (confirmado), pero se deriva del **`objective`** (`Fisico/Salud`=fuerza, `Atleta`=híbrido 50/50, `Carrera`=running). Implementar como **tabla de mapeo objetivo→score_type+pesos**, no columna nueva. Pendiente: confirmar si existe "Carrera con fuerza" (20/80). [detalle](../puntuaciones-entreno/auditoria-datos-reales.md#4-tipo-de-programa--derivable-de-objective-sin-columna-nueva-o-con-una-pequeña)
-- [~] **Clasificación de sesión de running** → PARCIAL: el modelo `plan_type`/`log_type` con `distance`/`time` **sí existe** en código (`marca_value.py`), + un tercer tipo `time_distance` no documentado. **Pero las zonas (Z2/Z3/Z4) NO tienen campo** (`category` 96% NULL) → inferir por naming de sesión o flag nuevo. Bloqueante de running que sigue abierto. [detalle](../puntuaciones-entreno/auditoria-datos-reales.md#5-running--el-modelo-del-spec-sí-es-real-con-un-matiz)
+- [x] **Auditar `exercise.muscle_group` y `exercise.equipment`** → HECHO. `muscle_group` **inservible** (valores burdos `Chest/Legs/Back/Arms` + ~30% IDs legacy Firebase; no separa cuádriceps/isquio ni bíceps/tríceps). `category` es mejor base pero bilingüe sucio y no separa pierna. **Los nombres de ejercicio del spec no existen literales** → mapear por ID real. Conclusión: **se necesita tabla de curación manual ejercicio→grupo** (no normalización automática). [detalle](../../archived/auditoria-datos-reales.md#1-grupos-musculares--muscle_group-es-inservible-category-es-la-mejor-base)
+- [x] **Catálogo curado de fuerza** → HECHO: de los 26 ejercicios del spec, **20 ya existen en la BD** (decisión Kata: no crear los 6 que faltan) → van en la mini-tabla `exercise_id → grupo`, con 7 compuestos principales como anclas. Ver [curacion-ejercicios-fuerza.md](../puntuaciones-entreno/curacion-ejercicios-fuerza.md).
+- [x] **Qué ejercicios cuentan** → DECIDIDO: `equipment` **no sirve** (vacío en los lifts core; no existe valor "Machine"). → **Mini-tabla de mapeo aparte** (`exercise_id → grupo_canonico`) con solo los 20 ejercicios curados. **Estar en la tabla = cuenta** → NO se añade columna `valid_for_score` ni se toca la tabla `exercises`. [detalle](../../archived/auditoria-datos-reales.md#2-equipment-no-sirve-para-filtrar-máquinas)
+- [x] **Tipo de programa** → DECIDIDO: `Program` no tiene columna tipo (confirmado), se deriva del **`objective_id`**. Mapeo real de prod (confirmado 18-jun por API `/api/dashboard/objectives`):
+
+  | `objective_id` | Nombre (prod) | score_type | Peso Fuerza | Peso Running |
+  |---|---|---|---|---|
+  | 1 | Físico | fuerza | 100% | — |
+  | 2 | Carrera | running | — | 100% |
+  | 3 | Hyrox | híbrido | 50% | 50% *(ajustable fase 2)* |
+  | 4 | Atleta | híbrido | 50% | 50% |
+
+  Implementar como **tabla de mapeo `objective_id → score_type + pesos`**, no columna en `programs`. (No existe "Salud" en prod; era data de test.) Pesos solo relevantes en fase 2 (MVP = solo fuerza).
+- [~] **Clasificación de sesión de running** → PARCIAL: el modelo `plan_type`/`log_type` con `distance`/`time` **sí existe** en código (`marca_value.py`), + un tercer tipo `time_distance` no documentado. **Pero las zonas (Z2/Z3/Z4) NO tienen campo** (`category` 96% NULL) → inferir por naming de sesión o flag nuevo. Bloqueante de running que sigue abierto. [detalle](../../archived/auditoria-datos-reales.md#5-running--el-modelo-del-spec-sí-es-real-con-un-matiz)
 - [x] **Texto-libre en `logged_value`** → CONFIRMADO viable: `marca_value.py` parsea robusto kg / mm:ss / km→m / reps. Pendiente solo medir % no parseable en logs reales.
 
 ## 2. Modelo de datos (API)
 
 - [ ] Migración Alembic: tabla **estándares de fuerza** (grupo, género, rango edad, umbrales por nivel).
 - [ ] Migración Alembic: tabla **estándares de running**.
-- [ ] Marcado de ejercicios **válidos para score** + **grupo muscular canónico** (columna nueva o tabla de mapeo).
-- [ ] Metadata de **tipo de programa** y **pesos Fuerza/Running** (si se decide columna en `programs`).
+- [ ] **Mini-tabla de mapeo** `exercise_id → grupo_muscular_canonico` con los 20 ejercicios curados (ver [curacion-ejercicios-fuerza.md](../puntuaciones-entreno/curacion-ejercicios-fuerza.md)). Estar en la tabla = cuenta para el score; sin flag booleano, sin tocar la tabla `exercises`.
+- [ ] **Tabla de mapeo `objective_id → score_type + pesos`** (Físico=1→fuerza, Carrera=2→running, Hyrox=3→híbrido 50/50, Atleta=4→híbrido 50/50). Ver tabla en §1. No columna en `programs`.
 - [ ] Tabla de **snapshots de score** (`user_id`, total, sub-scores, desglose por grupo/zona/ejercicio, `computed_at`) para el historial y para no recalcular en cada request. Refrescar snapshot de `reference_data.sql.gz` si las tablas de estándares son reference data.
 
 ## 3. Motor de cálculo — Fuerza (service nuevo, p. ej. `score_service.py`)

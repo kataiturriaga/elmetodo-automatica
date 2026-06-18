@@ -142,6 +142,6 @@ Esta tabla alimenta dos cosas en la implementación: la columna nueva **`valid_f
 
 ## Notas para implementación
 
-- Estos 20 IDs se marcan con **`valid_for_score = true`** + su **`grupo_muscular_canonico`** (los 7 grupos) en la tabla de curación/columna nueva (plan §2).
+- **Diseño de datos**: estos 20 IDs van en una **mini-tabla de mapeo aparte** (`exercise_id → grupo_muscular_canonico`), NO una columna en la tabla `exercises` (3.616 filas) ni se limpia la columna `muscle_group` (la usan otras pantallas). **Estar en la tabla = cuenta para el score** → no hace falta flag booleano `valid_for_score`. La calculadora puntúa solo los ejercicios que aparezcan aquí.
 - **6 ejercicios de tu lista NO existen** en la BD y NO se crean (decisión MVP): Press banca inclinado con mancuernas, Remo con barra agarre supino, Remo con mancuerna inclinado, Estocada con mancuernas, Peso muerto rumano con mancuerna, Press banca cerrado.
 - **Las tablas de estándares** (siguiente bloqueante, plan §1) se calibran contra los **7 compuestos principales** — son los que definen los rangos fuerza-relativa → score.
