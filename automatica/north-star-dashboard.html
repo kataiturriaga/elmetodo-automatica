@@ -32,17 +32,7 @@
   .top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:28px}
   .eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
   h1{font-size:32px;font-weight:800;letter-spacing:-.025em}
-  .sub{color:var(--text-3);font-size:14.5px;margin-top:6px;max-width:560px}
-  .badge{display:inline-flex;align-items:center;gap:8px;background:var(--pos-soft);border:1px solid #cdead6;
-    color:var(--pos);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:var(--r-pill);white-space:nowrap}
-  .dot{width:7px;height:7px;border-radius:50%;background:var(--pos)}
-
-  /* alert banner */
-  .risk{display:flex;gap:14px;align-items:flex-start;background:var(--danger-soft);border:1px solid #f6d4d4;
-    border-radius:var(--r);padding:18px 20px;margin-bottom:28px}
-  .risk .ico{font-size:16px;line-height:1.4}
-  .risk b{color:#b91c1c}
-  .risk p{font-size:14px;color:#7f1d1d}
+  .updated{font-size:12px;color:var(--text-3);font-weight:500;white-space:nowrap}
 
   .meta{font-size:14.5px;color:var(--text-3);margin-bottom:20px}
   .meta b{color:var(--text-2);font-weight:600}
@@ -55,11 +45,12 @@
   @media(max-width:760px){.hero-grid{grid-template-columns:1fr}}
   .star-label{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--accent);
     letter-spacing:.04em;margin-bottom:8px;background:var(--accent-soft);padding:5px 11px;border-radius:var(--r-pill)}
-  .star-name{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-bottom:5px}
+  .star-name{font-size:34px;font-weight:800;letter-spacing:-.02em;margin-bottom:5px}
   .star-def{font-size:14px;color:var(--text-3);max-width:430px}
   .star-num{display:flex;align-items:baseline;gap:14px;margin:20px 0 8px}
   .big{font-size:72px;font-weight:800;letter-spacing:-.04em;line-height:.9;color:var(--text-1)}
   .trend{font-size:13px;font-weight:600;color:var(--danger);background:var(--danger-soft);padding:6px 12px;border-radius:var(--r-pill)}
+  .trend.pos{color:var(--pos);background:var(--pos-soft)}
   .star-foot{font-size:13px;color:var(--text-3)}
   .star-foot .amber{color:var(--warn);font-weight:600}
   .progress{height:8px;border-radius:var(--r-pill);background:#eef0f3;overflow:hidden}
@@ -76,6 +67,38 @@
   /* section title */
   .sec{font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);margin:0 0 16px}
   .sec .ok{color:var(--pos)}
+
+  /* paneles de entreno (rejilla diaria + tabla de sesiones) */
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;margin-bottom:34px;box-shadow:var(--shadow-sm);overflow-x:auto}
+  .panel-note{font-size:11px;color:var(--text-3);margin-top:14px;line-height:1.55}
+  .panel-note b{color:var(--text-2);font-weight:600}
+  .dgrid{width:100%;border-collapse:separate;border-spacing:4px}
+  .dgrid th{font-size:10.5px;font-weight:600;color:var(--text-3);text-transform:uppercase;text-align:center;padding:2px 0}
+  .dgrid th.wk,.dgrid td.wk{text-align:left;white-space:nowrap}
+  .dgrid td.wk{font-size:11.5px;color:var(--text-2);padding-right:10px}
+  .dgrid td.wt{font-size:12.5px;font-weight:700;color:var(--text-2);text-align:center}
+  .dgrid th.wt{color:var(--text-3)}
+  .dcell{position:relative;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;cursor:default}
+  .dcell.z{background:#f1f3f6}
+  /* popover al pasar el ratón por una celda */
+  .panel.pop-ok{overflow:visible}
+  .pop{display:none;position:absolute;z-index:30;top:calc(100% + 7px);left:50%;transform:translateX(-50%);
+    background:#0f172a;border-radius:10px;padding:10px 12px;min-width:200px;max-width:300px;
+    box-shadow:0 12px 34px -8px rgba(0,0,0,.45);text-align:left;white-space:nowrap}
+  .pop::before{content:"";position:absolute;bottom:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:#0f172a}
+  .dcell:hover .pop{display:block}
+  .pop-h{font-size:10px;color:#cbd5e1;text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;font-weight:600}
+  .pop-u{font-size:12.5px;color:#fff;padding:4px 0;border-top:1px solid rgba(255,255,255,.09)}
+  .pop-u:first-of-type{border-top:none}
+  .pop-u b{font-weight:600}
+  .pop-u span{display:block;font-size:10.5px;color:#94a3b8;font-weight:400}
+  .stable{width:100%;border-collapse:collapse}
+  .stable th{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--text-3);text-align:left;padding:9px 10px;border-bottom:1px solid var(--border)}
+  .stable td{font-size:12.5px;color:var(--text-2);padding:9px 10px;border-bottom:1px solid var(--border-2)}
+  .stable td.r,.stable th.r{text-align:right}
+  .stable td.usr b{color:var(--text-1);font-weight:600}
+  .stable td.usr .em{display:block;font-size:11px;color:var(--text-3)}
+  .stable tr:last-child td{border-bottom:none}
 
   /* funnel */
   .funnel{display:flex;align-items:stretch;gap:14px;background:var(--card);border:1px solid var(--border);
@@ -114,7 +137,7 @@
   @media(max-width:560px){.slabel{width:110px;font-size:11px}.sdrop{width:44px}}
 
   /* palanca grid */
-  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:34px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:34px}
   @media(max-width:980px){.grid{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:520px){.grid{grid-template-columns:1fr}}
   .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;
@@ -152,9 +175,6 @@
   .leaf .box .t{font-size:13px;font-weight:700;margin-bottom:3px}
   .leaf .box .d{font-size:11px;color:var(--text-3)}
   .leaf .box .lv{font-size:10.5px;color:var(--accent);margin-top:7px;font-weight:600}
-
-  .foot{margin-top:30px;font-size:12px;color:var(--text-3);text-align:center;line-height:1.7}
-  .foot .ref{color:var(--text-2)}
 </style>
 </head>
 <body>
@@ -164,14 +184,8 @@
     <div>
       <div class="eyebrow">El Metodo · Automática</div>
       <h1>North Star Dashboard</h1>
-      <div class="sub">Sistema de Consistencia Deportiva — la estrella y las 4 palancas que la mueven.</div>
     </div>
-    <div class="badge"><span class="dot"></span>Datos reales · GA4 + API · 18-jun-2026</div>
-  </div>
-
-  <div class="risk">
-    <div class="ico">⚠️</div>
-    <p><b>Dos alarmas que destapan los datos reales.</b> (1) El USC ha caído <b>~60% desde mediados de mayo</b>, coincidiendo con el lanzamiento del onboarding nuevo (que obliga a registrarse antes de entrar). (2) La consistencia es <b>casi 100% pasos</b>: de 71 consistentes esta semana, solo <b>1</b> entrenó ≥3 veces — la parte de <i>entrenar</i> apenas ocurre. Correlación, no causa probada: investigar.</p>
+    <div class="updated">actualizado 22-06-2026 · 12:16 · GA4 + API</div>
   </div>
 
   <div class="meta">Meta-norte: <b>personas viviendo una vida deportiva constante</b> — romper el ciclo inicio → abandono → culpa.</div>
@@ -181,132 +195,168 @@
     <div class="hero-grid">
       <div>
         <div class="star-label">⭐ NORTH STAR METRIC</div>
-        <div class="star-name">Usuarios Semanalmente Consistentes</div>
-        <div class="star-def">Usuarios que completan <b style="color:var(--text-2)">≥ 3 sesiones de bienestar en 7 días</b> (entreno de fuerza o día de pasos con XP).</div>
+        <div class="star-name">Usuarios consistentes</div>
+        <div class="star-def">usuarios que completan +2 sesiones reales de entreno en 7 días</div>
         <div class="star-num">
-          <span class="big">71</span>
-          <span class="trend">▼ 60% desde mayo</span>
+          <span class="big">1</span>
+          <span class="trend ">▼ 67% vs 7d previos</span>
         </div>
-        <div class="star-foot">Meta trimestre: <b style="color:var(--accent)">3.000</b> · progreso 2,4% · <span class="amber">solo 1 por entrenos</span></div>
-        <div class="progress" style="margin-top:12px;max-width:330px"><i style="width:2.4%"></i></div>
+        <div class="star-foot">Meta trimestre: <b style="color:var(--accent)">3.000</b> · progreso 0%</div>
+        <div class="progress" style="margin-top:12px;max-width:330px"><i style="width:0.03%"></i></div>
       </div>
       <div>
         <div class="spark">
-          <div class="bar old" style="height:92%"><span>249</span></div>
-          <div class="bar old" style="height:83%"><span>224</span></div>
-          <div class="bar" style="height:34%"><span>92</span></div>
-          <div class="bar" style="height:31%"><span>85</span></div>
-          <div class="bar" style="height:29%"><span>79</span></div>
-          <div class="bar now" style="height:27%"><span>72</span></div>
+          <div class="bar" style="height:25%"><span>1</span></div>
+          <div class="bar" style="height:25%"><span>1</span></div>
+          <div class="bar" style="height:25%"><span>1</span></div>
+          <div class="bar" style="height:25%"><span>1</span></div>
+          <div class="bar" style="height:100%"><span>4</span></div>
+          <div class="bar now" style="height:50%"><span>2</span></div>
         </div>
-        <div class="spark-cap">USC/semana · la caída coincide con el onboarding nuevo (11-may)</div>
+        <div class="spark-cap">usuarios con ≥2 sesiones reales/sem · últimas 6 semanas</div>
       </div>
     </div>
   </div>
 
+  <!-- ENTRENOS · SEMANA x DIA -->
+  <div class="sec">Entrenos — usuarios que completaron ≥1 sesión real, por día</div>
+  <div class="panel pop-ok">
+    <table class="dgrid">
+      <tr><th class="wk">semana</th><th>L</th><th>M</th><th>X</th><th>J</th><th>V</th><th>S</th><th>D</th><th class="wt">ses.</th><th class="wt">min</th></tr>
+      <tr><td class="wk">22-jun</td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td class="wt">0</td><td class="wt">—</td></tr>
+      <tr><td class="wk">15-jun</td><td><div class="dcell" style="background:rgba(79,70,229,1.00)">2<div class="pop"><div class="pop-h">15-jun · 2 usuario(s)</div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div><div class="pop-u"><b>clari</b><span>claricerodiel@gmail.com</span></div></div></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">16-jun · 1 usuario(s)</div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div></div></div></td><td><div class="dcell" style="background:rgba(79,70,229,1.00)">2<div class="pop"><div class="pop-h">17-jun · 2 usuario(s)</div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div><div class="pop-u"><b>clari</b><span>claricerodiel@gmail.com</span></div></div></div></td><td><div class="dcell" style="background:rgba(79,70,229,1.00)">2<div class="pop"><div class="pop-h">18-jun · 2 usuario(s)</div><div class="pop-u"><b>mariaje zurro</b><span>ruxo666@gmail.com</span></div><div class="pop-u"><b>Rena</b><span>renacrdr@gmail.com</span></div></div></div></td><td><div class="dcell z"></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">20-jun · 1 usuario(s)</div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div></div></div></td><td><div class="dcell z"></div></td><td class="wt">8</td><td class="wt">54′</td></tr>
+      <tr><td class="wk">08-jun</td><td><div class="dcell" style="background:rgba(79,70,229,1.00)">2<div class="pop"><div class="pop-h">08-jun · 2 usuario(s)</div><div class="pop-u"><b>Kata</b><span>kaitugraphics@gmail.com</span></div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div></div></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">09-jun · 1 usuario(s)</div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div></div></div></td><td><div class="dcell" style="background:rgba(79,70,229,1.00)">2<div class="pop"><div class="pop-h">10-jun · 2 usuario(s)</div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div><div class="pop-u"><b>anónimo</b><span>id 9572</span></div></div></div></td><td><div class="dcell" style="background:rgba(79,70,229,1.00)">2<div class="pop"><div class="pop-h">11-jun · 2 usuario(s)</div><div class="pop-u"><b>clari</b><span>claricerodiel@gmail.com</span></div><div class="pop-u"><b>anónimo</b><span>id 9572</span></div></div></div></td><td><div class="dcell z"></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">13-jun · 1 usuario(s)</div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div></div></div></td><td><div class="dcell z"></div></td><td class="wt">10</td><td class="wt">42′</td></tr>
+      <tr><td class="wk">01-jun</td><td><div class="dcell" style="background:rgba(79,70,229,1.00)">2<div class="pop"><div class="pop-h">01-jun · 2 usuario(s)</div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div><div class="pop-u"><b>clari</b><span>claricerodiel@gmail.com</span></div></div></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">02-jun · 1 usuario(s)</div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div></div></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">03-jun · 1 usuario(s)</div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div></div></div></td><td><div class="dcell z"></div></td><td><div class="dcell" style="background:rgba(79,70,229,1.00)">2<div class="pop"><div class="pop-h">05-jun · 2 usuario(s)</div><div class="pop-u"><b>Kata</b><span>kaitugraphics@gmail.com</span></div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div></div></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td class="wt">6</td><td class="wt">52′</td></tr>
+      <tr><td class="wk">25-may</td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">25-may · 1 usuario(s)</div><div class="pop-u"><b>yanna</b><span>yanninha18@gmail.com</span></div></div></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">26-may · 1 usuario(s)</div><div class="pop-u"><b>yanna</b><span>yanninha18@gmail.com</span></div></div></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">29-may · 1 usuario(s)</div><div class="pop-u"><b>Charly solis</b><span>charlydj64@gmail.com</span></div></div></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td class="wt">3</td><td class="wt">62′</td></tr>
+      <tr><td class="wk">18-may</td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">18-may · 1 usuario(s)</div><div class="pop-u"><b>yanna</b><span>yanninha18@gmail.com</span></div></div></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">24-may · 1 usuario(s)</div><div class="pop-u"><b>yanna</b><span>yanninha18@gmail.com</span></div></div></div></td><td class="wt">2</td><td class="wt">57′</td></tr>
+      <tr><td class="wk">11-may</td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">11-may · 1 usuario(s)</div><div class="pop-u"><b>sergio granados</b><span>sgranados424@gmail.com</span></div></div></div></td><td><div class="dcell z"></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">13-may · 1 usuario(s)</div><div class="pop-u"><b>sergio granados</b><span>sgranados424@gmail.com</span></div></div></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">14-may · 1 usuario(s)</div><div class="pop-u"><b>yanna</b><span>yanninha18@gmail.com</span></div></div></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">15-may · 1 usuario(s)</div><div class="pop-u"><b>sergio granados</b><span>sgranados424@gmail.com</span></div></div></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td class="wt">4</td><td class="wt">74′</td></tr>
+      <tr><td class="wk">04-may</td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">04-may · 1 usuario(s)</div><div class="pop-u"><b>sergio granados</b><span>sgranados424@gmail.com</span></div></div></div></td><td><div class="dcell z"></div></td><td><div class="dcell" style="background:rgba(79,70,229,0.60)">1<div class="pop"><div class="pop-h">06-may · 1 usuario(s)</div><div class="pop-u"><b>sergio granados</b><span>sgranados424@gmail.com</span></div></div></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td><div class="dcell z"></div></td><td class="wt">2</td><td class="wt">63′</td></tr>
+    </table>
+    <div class="panel-note">Cada celda = nº de usuarios distintos que completaron ≥1 sesión <b>real</b> (≥5 min, o ≥1 ejercicio si falta la duración) ese día — <b>pasa el ratón por encima para ver quién entrenó</b> (nombre y email). <b>ses.</b> = sesiones reales de la semana · <b>min</b> = mediana de minutos por sesión. Se eliminan los disparos duplicados del evento.</div>
+  </div>
+
+  <!-- ENTRENOS · DETALLE -->
+  <div class="sec">Últimas sesiones reales — quién, qué programa, qué sesión, cuántos minutos</div>
+  <div class="panel">
+    <table class="stable">
+      <tr><th>Fecha</th><th>Usuario</th><th>Programa</th><th>Sesión</th><th class="r">Min</th><th class="r">Ejerc.</th></tr>
+      <tr><td>20-jun</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Día 4 (Opcional)</td><td class="r">63′</td><td class="r">5</td></tr>
+      <tr><td>18-jun</td><td class="usr"><b>Rena</b><span class="em">renacrdr@gmail.com</span></td><td>Cuerpo construido Pro</td><td>Fuerza Torso</td><td class="r">5′</td><td class="r">6</td></tr>
+      <tr><td>18-jun</td><td class="usr"><b>mariaje zurro</b><span class="em">ruxo666@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Glúteo + Pierna</td><td class="r">54′</td><td class="r">5</td></tr>
+      <tr><td>17-jun</td><td class="usr"><b>clari</b><span class="em">claricerodiel@gmail.com</span></td><td>Cuerpo definido Pro</td><td>Fuerza Torso</td><td class="r">34′</td><td class="r">6</td></tr>
+      <tr><td>17-jun</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Fuerza Global</td><td class="r">59′</td><td class="r">5</td></tr>
+      <tr><td>16-jun</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Pierna + Core</td><td class="r">44′</td><td class="r">5</td></tr>
+      <tr><td>15-jun</td><td class="usr"><b>clari</b><span class="em">claricerodiel@gmail.com</span></td><td>Cuerpo definido Pro</td><td>Fuerza Piernas</td><td class="r">34′</td><td class="r">5</td></tr>
+      <tr><td>15-jun</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Fuerza Torso</td><td class="r">71′</td><td class="r">6</td></tr>
+      <tr><td>13-jun</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Día 4 (Opcional)</td><td class="r">60′</td><td class="r">5</td></tr>
+      <tr><td>11-jun</td><td class="usr"><b>clari</b><span class="em">claricerodiel@gmail.com</span></td><td>Cuerpo definido Starter</td><td>Torso + Abdomen</td><td class="r">39′</td><td class="r">6</td></tr>
+      <tr><td>11-jun</td><td class="usr"><b>clari</b><span class="em">claricerodiel@gmail.com</span></td><td>Cuerpo definido Starter</td><td>Glúteo + Pierna</td><td class="r">40′</td><td class="r">6</td></tr>
+      <tr><td>11-jun</td><td class="usr"><b>anónimo</b><span class="em">id 9572</span></td><td>Cuerpo definido Pro</td><td>Fuerza Piernas</td><td class="r">29′</td><td class="r">4</td></tr>
+      <tr><td>10-jun</td><td class="usr"><b>anónimo</b><span class="em">id 9572</span></td><td>Cuerpo definido Pro</td><td>Fuerza Torso</td><td class="r">26′</td><td class="r">5</td></tr>
+      <tr><td>10-jun</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Fuerza Global</td><td class="r">56′</td><td class="r">5</td></tr>
+      <tr><td>09-jun</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Pierna + Core</td><td class="r">42′</td><td class="r">5</td></tr>
+      <tr><td>08-jun</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Fuerza Torso</td><td class="r">48′</td><td class="r">6</td></tr>
+      <tr><td>08-jun</td><td class="usr"><b>Kata</b><span class="em">kaitugraphics@gmail.com</span></td><td>Tu primera Hyrox Pro</td><td>Sesión Miércoles</td><td class="r">—</td><td class="r">3</td></tr>
+      <tr><td>08-jun</td><td class="usr"><b>Kata</b><span class="em">kaitugraphics@gmail.com</span></td><td>Tu primera Hyrox Pro</td><td>Sesión Sábado</td><td class="r">—</td><td class="r">1</td></tr>
+      <tr><td>05-jun</td><td class="usr"><b>Kata</b><span class="em">kaitugraphics@gmail.com</span></td><td>Tu primera Hyrox Pro</td><td>Sesión Sábado</td><td class="r">—</td><td class="r">1</td></tr>
+      <tr><td>05-jun</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Día 4 (Opcional)</td><td class="r">61′</td><td class="r">4</td></tr>
+      <tr><td>03-jun</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Fuerza Global</td><td class="r">60′</td><td class="r">5</td></tr>
+      <tr><td>02-jun</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Pierna + Core</td><td class="r">47′</td><td class="r">5</td></tr>
+      <tr><td>01-jun</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Fuerza Torso</td><td class="r">52′</td><td class="r">7</td></tr>
+      <tr><td>01-jun</td><td class="usr"><b>clari</b><span class="em">claricerodiel@gmail.com</span></td><td>Cuerpo definido Starter</td><td>Glúteo + Pierna</td><td class="r">37′</td><td class="r">6</td></tr>
+      <tr><td>29-may</td><td class="usr"><b>Charly solis</b><span class="em">charlydj64@gmail.com</span></td><td>Cuerpo construido Starter</td><td>Fuerza Torso</td><td class="r">—</td><td class="r">1</td></tr>
+      <tr><td>26-may</td><td class="usr"><b>yanna</b><span class="em">yanninha18@gmail.com</span></td><td>Cuerpo definido Starter</td><td>Glúteo + Pierna</td><td class="r">51′</td><td class="r">3</td></tr>
+      <tr><td>25-may</td><td class="usr"><b>yanna</b><span class="em">yanninha18@gmail.com</span></td><td>Cuerpo definido Starter</td><td>Glúteo + Pierna</td><td class="r">62′</td><td class="r">4</td></tr>
+      <tr><td>24-may</td><td class="usr"><b>yanna</b><span class="em">yanninha18@gmail.com</span></td><td>Cuerpo definido Starter</td><td>Torso + Abdomen</td><td class="r">57′</td><td class="r">6</td></tr>
+      <tr><td>18-may</td><td class="usr"><b>yanna</b><span class="em">yanninha18@gmail.com</span></td><td>Cuerpo definido Starter</td><td>Torso + Abdomen</td><td class="r">54′</td><td class="r">4</td></tr>
+      <tr><td>15-may</td><td class="usr"><b>sergio granados</b><span class="em">sgranados424@gmail.com</span></td><td>Cuerpo definido Starter</td><td>Torso (Opcional)</td><td class="r">65′</td><td class="r">5</td></tr>
+    </table>
+  </div>
+
   <!-- EMBUDO NUEVO -->
-  <div class="sec">Negocio — embudo nuevo: cuestionario → registro → pago <span class="ok">· datos reales (GA4)</span></div>
+  <div class="sec">Negocio — embudo nuevo: cuestionario → registro → pago</div>
   <div class="funnel">
     <div class="fstep">
       <div class="flabel">Inició</div>
-      <div class="fnum">193</div>
+      <div class="fnum">202</div>
       <div class="fbar"><i style="width:100%"></i></div>
-      <div class="fsub">abren el onboarding · <span>onboarding_started</span></div>
+      <div class="fsub">abren el onboarding</div>
     </div>
     <div class="farrow">→</div>
     <div class="fstep">
       <div class="flabel">Completó quiz</div>
-      <div class="fnum">60</div>
-      <div class="fbar"><i style="width:31%"></i></div>
-      <div class="fsub">31% · recibió programa · <span>recommendation_fetched</span></div>
+      <div class="fnum">65</div>
+      <div class="fbar"><i style="width:32%"></i></div>
+      <div class="fsub">32% · recibió programa</div>
     </div>
     <div class="farrow">→</div>
     <div class="fstep">
       <div class="flabel">Registro</div>
-      <div class="fnum">51</div>
-      <div class="fbar"><i style="width:26%"></i></div>
-      <div class="fsub">26% · crean cuenta · <span>register_success</span></div>
+      <div class="fnum">56</div>
+      <div class="fbar"><i style="width:28%"></i></div>
+      <div class="fsub">28% · crean cuenta</div>
     </div>
     <div class="farrow">→</div>
     <div class="fstep accent">
       <div class="flabel">Pago</div>
-      <div class="fnum">16</div>
-      <div class="fbar"><i style="width:8.3%"></i></div>
-      <div class="fsub">8,3% · pagó / trial · <span>purchase_completed</span></div>
+      <div class="fnum">20</div>
+      <div class="fbar"><i style="width:9.9%"></i></div>
+      <div class="fsub">9,9% · pagó / trial</div>
     </div>
     <div class="fconv">
-      <div class="fconv-num">26%</div>
-      <div class="fconv-lbl">cuestionario&nbsp;→&nbsp;registro</div>
-      <div class="fconv-sub">registro → pago: <b style="color:var(--accent)">31%</b><br>inicio → pago: 8,3%<br><span class="warn">⚠ fuga en pasos 1–4 (ver detalle abajo)</span></div>
+      <div class="fconv-num">28%</div>
+      <div class="fconv-lbl">inicio&nbsp;→&nbsp;registro</div>
+      <div class="fconv-sub">registro → pago: <b style="color:var(--accent)">36%</b><br>inicio → pago: 9,9%</div>
     </div>
-  </div>
-  <div class="note">
-    <b style="color:var(--pos)">Datos reales GA4</b> · cohorte del onboarding nuevo desde 11-may-2026 (n=193, muestra pequeña).
-    Stock acumulado (API, todo el histórico): <b>542 registrados · 38 pagaron alguna vez · 7 activos · MRR 69,98 €</b>.
-    Los 2.113 “invitados” del embudo antiguo ya no aplican.
   </div>
 
   <!-- DROP-OFF POR PASO -->
-  <div class="sec">Dónde se cae la gente — los 15 pasos del onboarding <span class="ok">· datos reales (GA4)</span></div>
+  <div class="sec">Dónde se cae la gente — los 16 pasos del onboarding</div>
   <div class="steps">
-    <div class="srow"><div class="slabel">1 · Welcome</div><div class="strack"><div class="sfill" style="width:100%">196</div></div><div class="sdrop"></div></div>
-    <div class="srow"><div class="slabel">2 · Vídeo intro</div><div class="strack"><div class="sfill bad" style="width:54%">105</div></div><div class="sdrop big">−46%</div></div>
-    <div class="srow"><div class="slabel">3 · Datos personales</div><div class="strack"><div class="sfill" style="width:50%">98</div></div><div class="sdrop">−7%</div></div>
-    <div class="srow"><div class="slabel">4 · Objetivo</div><div class="strack"><div class="sfill bad" style="width:31%">61</div></div><div class="sdrop big">−38%</div></div>
-    <div class="srow"><div class="slabel">5 · Prueba social</div><div class="strack"><div class="sfill" style="width:33%">64</div></div><div class="sdrop"></div></div>
-    <div class="srow"><div class="slabel">6 · Tipo de entreno</div><div class="strack"><div class="sfill" style="width:32%">63</div></div><div class="sdrop"></div></div>
-    <div class="srow"><div class="slabel">7 · Dónde entrenas</div><div class="strack"><div class="sfill" style="width:32%">62</div></div><div class="sdrop"></div></div>
-    <div class="srow"><div class="slabel">8 · Nivel</div><div class="strack"><div class="sfill" style="width:32%">62</div></div><div class="sdrop"></div></div>
-    <div class="srow"><div class="slabel">9 · Días/semana</div><div class="strack"><div class="sfill" style="width:32%">62</div></div><div class="sdrop"></div></div>
-    <div class="srow"><div class="slabel">10 · Programa recom.</div><div class="strack"><div class="sfill" style="width:32%">62</div></div><div class="sdrop"></div></div>
-    <div class="srow"><div class="slabel">11 · Metodología</div><div class="strack"><div class="sfill" style="width:31%">60</div></div><div class="sdrop">−3%</div></div>
-    <div class="srow"><div class="slabel">12 · Registro</div><div class="strack"><div class="sfill" style="width:32%">62</div></div><div class="sdrop"></div></div>
-    <div class="srow"><div class="slabel">13 · Salud</div><div class="strack"><div class="sfill warn" style="width:27%">53</div></div><div class="sdrop mid">−15%</div></div>
-    <div class="srow"><div class="slabel">14 · Paywall</div><div class="strack"><div class="sfill" style="width:27%">52</div></div><div class="sdrop"></div></div>
-    <div class="srow"><div class="slabel">→ Pago</div><div class="strack"><div class="sfill warn" style="width:9%">18</div></div><div class="sdrop mid">−65%</div></div>
-  </div>
-  <div class="note" style="margin-top:-22px">
-    <b style="color:var(--danger)">Toda la sangría está en los pasos 1–4.</b> Pasado el Objetivo (step 4), casi todos completan y se registran (~62 estable). Atacar primero: <b>Welcome→Vídeo (−46%)</b> y <b>Datos personales→Objetivo (−38%)</b>.
+    <div class="srow"><div class="slabel">1 · Welcome</div><div class="strack"><div class="sfill" style="width:100%">202</div></div><div class="sdrop"></div></div>
+    <div class="srow"><div class="slabel">2 · Vídeo intro</div><div class="strack"><div class="sfill bad" style="width:53%">108</div></div><div class="sdrop big">−47%</div></div>
+    <div class="srow"><div class="slabel">3 · Datos personales</div><div class="strack"><div class="sfill" style="width:50%">101</div></div><div class="sdrop">−6%</div></div>
+    <div class="srow"><div class="slabel">4 · Objetivo concreto</div><div class="strack"><div class="sfill bad" style="width:32%">64</div></div><div class="sdrop big">−37%</div></div>
+    <div class="srow"><div class="slabel">5 · Prueba social</div><div class="strack"><div class="sfill" style="width:33%">67</div></div><div class="sdrop"></div></div>
+    <div class="srow"><div class="slabel">6 · Objetivo</div><div class="strack"><div class="sfill" style="width:33%">66</div></div><div class="sdrop">−1%</div></div>
+    <div class="srow"><div class="slabel">7 · Dónde entrenas</div><div class="strack"><div class="sfill" style="width:32%">65</div></div><div class="sdrop">−2%</div></div>
+    <div class="srow"><div class="slabel">8 · Nivel</div><div class="strack"><div class="sfill" style="width:32%">65</div></div><div class="sdrop"></div></div>
+    <div class="srow"><div class="slabel">9 · Días/semana</div><div class="strack"><div class="sfill" style="width:32%">65</div></div><div class="sdrop"></div></div>
+    <div class="srow"><div class="slabel">10 · Programa recom.</div><div class="strack"><div class="sfill" style="width:32%">65</div></div><div class="sdrop"></div></div>
+    <div class="srow"><div class="slabel">11 · Metodología</div><div class="strack"><div class="sfill" style="width:31%">63</div></div><div class="sdrop">−3%</div></div>
+    <div class="srow"><div class="slabel">12 · Registro</div><div class="strack"><div class="sfill" style="width:32%">65</div></div><div class="sdrop"></div></div>
+    <div class="srow"><div class="slabel">13 · Salud</div><div class="strack"><div class="sfill warn" style="width:28%">56</div></div><div class="sdrop mid">−14%</div></div>
+    <div class="srow"><div class="slabel">14 · Paywall</div><div class="strack"><div class="sfill" style="width:27%">55</div></div><div class="sdrop">−2%</div></div>
+    <div class="srow"><div class="slabel">15 · → Pago</div><div class="strack"><div class="sfill bad" style="width:10%">20</div></div><div class="sdrop big">−64%</div></div>
+    <div class="srow"><div class="slabel">16 · Notificaciones</div><div class="strack"><div class="sfill" style="width:11%">22</div></div><div class="sdrop"></div></div>
   </div>
 
   <!-- PALANCAS -->
-  <div class="sec">Las 4 palancas que la mueven <span class="ok">· datos reales</span></div>
+  <div class="sec">Las 3 palancas que la mueven</div>
   <div class="grid">
 
     <div class="card">
       <div class="n"><div class="idx">1</div><div class="chip">Entrada</div></div>
       <h3>Activación temprana</h3>
-      <div class="vals"><span class="vnow bad">1,3%</span><span class="vtar">meta <b>&gt;35%</b></span></div>
-      <div class="cardsub">1er entreno en ≤3 días · <b>a 1ª actividad (pasos): 22,6%</b></div>
-      <div class="progress warn"><i style="width:4%"></i></div>
-      <div class="lever">Palanca: <b>onboarding / cuestionario</b> · 🔴 muy lejos de meta (n=380 inst.)</div>
+      <div class="vals"><span class="vnow bad">5,4%</span><span class="vtar">meta <b>&gt;35%</b></span></div>
+      <div class="cardsub">1er entreno en ≤3 días · 3/56 registrados</div>
+      <div class="progress warn"><i style="width:15%"></i></div>
     </div>
 
     <div class="card">
       <div class="n"><div class="idx">2</div><div class="chip">Vuelta diaria</div></div>
       <h3>Enganche social</h3>
-      <div class="vals"><span class="vnow warn">22%</span><span class="vtar">meta <b>&gt;55%</b></span></div>
-      <div class="cardsub">abren ranking (7d) · <b>solo 4 lo hacen ≥3 días/sem</b></div>
-      <div class="progress warn"><i style="width:40%"></i></div>
-      <div class="lever">Palanca: <b>ligas</b> · XP unificado · democión · friend quests</div>
-    </div>
-
-    <div class="card muted">
-      <div class="n"><div class="idx">3</div><div class="chip">Continuidad</div></div>
-      <h3>Protección de racha</h3>
-      <div class="vals"><span class="vnow" style="color:var(--text-3);font-size:22px">— sin datos</span></div>
-      <div class="cardsub">no hay eventos de racha / streak freeze</div>
-      <div class="progress"><i style="width:0%"></i></div>
-      <div class="lever">Palanca: <b>seguro de racha</b> · pendiente de instrumentar (decisión: aparcado)</div>
+      <div class="vals"><span class="vnow bad">12,1%</span><span class="vtar">meta <b>&gt;55%</b></span></div>
+      <div class="cardsub">abren ranking (7d) · sobre 99 activos</div>
+      <div class="progress warn"><i style="width:22%"></i></div>
     </div>
 
     <div class="card">
-      <div class="n"><div class="idx">4</div><div class="chip">Skin in the game</div></div>
+      <div class="n"><div class="idx">3</div><div class="chip">Skin in the game</div></div>
       <h3>Compromiso por pago</h3>
-      <div class="vals"><span class="vnow warn">11,3%</span><span class="vtar">meta <b>&gt;25%</b></span></div>
-      <div class="cardsub">trial → paid (API) · <b>13 trials en 90d</b></div>
-      <div class="progress warn"><i style="width:45%"></i></div>
-      <div class="lever">Palanca: <b>paywall</b> como dispositivo de compromiso voluntario</div>
+      <div class="vals"><span class="vnow warn">11,6%</span><span class="vtar">meta <b>&gt;25%</b></span></div>
+      <div class="cardsub">trial → paid (API) · 337 trials</div>
+      <div class="progress warn"><i style="width:46%"></i></div>
     </div>
 
   </div>
@@ -315,20 +365,14 @@
   <div class="sec">El árbol — cómo se conecta todo</div>
   <div class="tree-wrap">
     <div class="tree">
-      <div class="node-star">⭐ Usuarios Semanalmente Consistentes <span>(≥3 sesiones / 7 días)</span></div>
+      <div class="node-star">⭐ Usuarios consistentes <span>(≥2 entrenos / 7 días)</span></div>
       <div class="connector"></div>
       <div class="branch">
         <div class="leaf"><div class="h"></div><div class="box"><div class="t">1 · Activación temprana</div><div class="d">1er entreno en 3 días</div><div class="lv">Onboarding · efecto IKEA</div></div></div>
         <div class="leaf"><div class="h"></div><div class="box"><div class="t">2 · Enganche social</div><div class="d">ranking ≥3 días/sem</div><div class="lv">Ligas · XP unificado</div></div></div>
-        <div class="leaf"><div class="h"></div><div class="box"><div class="t">3 · Protección de racha</div><div class="d">streak freeze</div><div class="lv">Seguro de racha</div></div></div>
-        <div class="leaf"><div class="h"></div><div class="box"><div class="t">4 · Compromiso por pago</div><div class="d">trial → paid</div><div class="lv">Paywall compromiso</div></div></div>
+        <div class="leaf"><div class="h"></div><div class="box"><div class="t">3 · Compromiso por pago</div><div class="d">trial → paid</div><div class="lv">Paywall compromiso</div></div></div>
       </div>
     </div>
-  </div>
-
-  <div class="foot">
-    Para subir la estrella no se ataca la estrella: se mueve <b style="color:var(--text-2)">una de las 4 palancas</b> de abajo.<br>
-    Fuente: GA4 (BigQuery <span class="ref">automatica-v2</span>) + API <span class="ref">/dashboard/subscriptions</span> · El Metodo · Automática, 18-jun-2026
   </div>
 
 </div>

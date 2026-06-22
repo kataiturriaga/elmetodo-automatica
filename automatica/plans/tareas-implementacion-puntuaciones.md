@@ -58,7 +58,7 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 - [ ] Migración Alembic: tabla **estándares de running**.
 - [ ] **Mini-tabla de mapeo** `exercise_id → grupo_muscular_canonico` con los 20 ejercicios curados (ver [curacion-ejercicios-fuerza.md](../puntuaciones-entreno/curacion-ejercicios-fuerza.md)). Estar en la tabla = cuenta para el score; sin flag booleano, sin tocar la tabla `exercises`.
 - [ ] **Tabla de mapeo `objective_id → score_type + pesos`** (Físico=1→fuerza, Carrera=2→running, Hyrox=3→híbrido 50/50, Atleta=4→híbrido 50/50). Ver tabla en §1. No columna en `programs`.
-- [ ] Tabla de **snapshots de score** (`user_id`, total, sub-scores, desglose por grupo/zona/ejercicio, `computed_at`) para el historial y para no recalcular en cada request. Refrescar snapshot de `reference_data.sql.gz` si las tablas de estándares son reference data.
+- [ ] Tabla de **snapshots de score** (`user_id`, total, sub-scores, desglose por grupo/zona/ejercicio, **`bodyweight` usado**, `computed_at`) para el historial y para no recalcular en cada request. Guardar el **peso corporal vigente en el momento de la foto** (decisión Kata 18-jun): hace el snapshot autoexplicativo y permite contar en la gráfica "tu score subió porque bajaste de peso". (Detalle por-ejercicio del peso por fecha = fuera de MVP.) Refrescar snapshot de `reference_data.sql.gz` si las tablas de estándares son reference data.
 
 ## 3. Motor de cálculo — Fuerza (service nuevo, p. ej. `score_service.py`)
 
@@ -82,8 +82,8 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 ## 5. Motor — Híbrido + orquestación
 
 - [ ] **Score total** = promedio ponderado(Fuerza, Running) según pesos del programa; exponer siempre los **dos sub-scores**.
-- [ ] **Registros expirados** (>3 meses) y su efecto.
-- [ ] **Recálculo**: tarea Celery (batch diario) y/o trigger al completar entreno / registrar peso. Persistir snapshot (sección 2).
+- [ ] **Registros expirados** (>3 meses) y su efecto: el score puede **bajar solo** cuando la mejor marca cae de la ventana de 3 meses, sin actividad del usuario.
+- [ ] **Cuándo se saca snapshot** → DECIDIDO (18-jun, basado en cuándo cambia el valor de verdad, no batch diario para todos): (1) al **completar entreno**, (2) al **registrar peso corporal** (cambia la fuerza relativa aunque no entrene — ej. Gravl), (3) **repaso periódico ligero** (semanal) para capturar marcas que caducan (caso de registros expirados). Persistir snapshot (sección 2).
 - [ ] Tests unitarios de fórmulas (Epley, fuerza relativa, paces, ponderaciones, promedios con grupos vacíos) — sin mocks de DB en integración (convención del repo).
 
 ## 6. Sesiones de evaluación — solución cold-start
@@ -94,6 +94,7 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 - [ ] **Test ligero de running de inicio** (contenido): proxy corto escalado al nivel del programa (time-trial 1–2 km o test 12 min) que dé un pace de arranque. El Test completo del spec se mantiene al final.
 - [ ] **Flag de "sesión de evaluación"** en `training_day_v2` (o ejercicio) que marque qué sesiones cuentan como baseline. Alinear con el tipo de sesión "Test" del running.
 - [ ] **Empty state de onboarding** en el tab Puntuaciones: antes de completar la evaluación, mostrar "Completa tu sesión de evaluación para ver tu nivel" en vez de score en cero.
+- [ ] **Peso corporal obligatorio para el score**: si el usuario no tiene peso registrado (`Progress`/`Questionnaire`), no se puede calcular la fuerza relativa → mostrar prompt "Necesitamos tu peso para calcular tu puntuación" con acceso directo a registrarlo (decisión Kata 18-jun: se le pide, no se bloquea). Medir % de usuarios reales sin peso.
 - [ ] Medir **time-to-first-score** como métrica secundaria (ver visión §2).
 
 ## 7. API — Endpoints (mobile)
