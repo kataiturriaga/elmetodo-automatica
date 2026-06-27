@@ -54,22 +54,26 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 
 ## 2. Modelo de datos (API)
 
-- [ ] Migración Alembic: tabla **estándares de fuerza** (grupo, género, rango edad, umbrales por nivel).
-- [ ] Migración Alembic: tabla **estándares de running**.
-- [ ] **Mini-tabla de mapeo** `exercise_id → grupo_muscular_canonico` con los 20 ejercicios curados (ver [curacion-ejercicios-fuerza.md](../puntuaciones-entreno/curacion-ejercicios-fuerza.md)). Estar en la tabla = cuenta para el score; sin flag booleano, sin tocar la tabla `exercises`.
-- [ ] **Tabla de mapeo `objective_id → score_type + pesos`** (Físico=1→fuerza, Carrera=2→running, Hyrox=3→híbrido 50/50, Atleta=4→híbrido 50/50). Ver tabla en §1. No columna en `programs`.
-- [ ] Tabla de **snapshots de score** (`user_id`, total, sub-scores, desglose por grupo/zona/ejercicio, **`bodyweight` usado**, `computed_at`) para el historial y para no recalcular en cada request. Guardar el **peso corporal vigente en el momento de la foto** (decisión Kata 18-jun): hace el snapshot autoexplicativo y permite contar en la gráfica "tu score subió porque bajaste de peso". (Detalle por-ejercicio del peso por fecha = fuera de MVP.) Refrescar snapshot de `reference_data.sql.gz` si las tablas de estándares son reference data.
+> ✅ **PR #1 FUSIONADO a `main` (25-jun-2026).** [PR #125](https://github.com/carles-mallafre/metodo_api/pull/125) (rama `feat/puntuaciones-modelo-datos`), aprobado y mergeado por Carles. Migración `create_score_tables` (4 tablas + seed) probada en local (PG17). Convención de seeding documentada en `docs/plans/training-score.md` (repo API) y [Decisiones Código](../Decisiones%20Código/2026-06-25-puntuaciones-seeding-datos-referencia.md).
+
+- [x] Migración Alembic: tabla **estándares de fuerza** (grupo, género, rango edad, umbrales por nivel). → `strength_standards`, 84 filas seed (números v1 en `app/data/strength_standards_v1.py`). *Ajuste de edad NO va en tabla: irá en el motor §3.*
+- [ ] Migración Alembic: tabla **estándares de running**. → **fase 2** (sin datos para calibrar).
+- [x] **Mini-tabla de mapeo** `exercise_id → grupo_muscular_canonico` con los 20 ejercicios curados (ver [curacion-ejercicios-fuerza.md](../puntuaciones-entreno/curacion-ejercicios-fuerza.md)). Estar en la tabla = cuenta para el score; sin flag booleano, sin tocar la tabla `exercises`. → `score_exercise_muscle_groups`, 20 filas + `is_anchor`.
+- [x] **Tabla de mapeo `objective_id → score_type + pesos`** (Físico=1→fuerza, Carrera=2→running, Hyrox=3→híbrido 50/50, Atleta=4→híbrido 50/50). Ver tabla en §1. No columna en `programs`. → `objective_score_types`, 4 filas.
+- [x] Tabla de **snapshots de score** (`user_id`, total, sub-scores, desglose por grupo/zona/ejercicio, **`bodyweight` usado**, `computed_at`) para el historial y para no recalcular en cada request. Guardar el **peso corporal vigente en el momento de la foto** (decisión Kata 18-jun): hace el snapshot autoexplicativo y permite contar en la gráfica "tu score subió porque bajaste de peso". (Detalle por-ejercicio del peso por fecha = fuera de MVP.) → `score_snapshots`, `breakdown` JSON.
 
 ## 3. Motor de cálculo — Fuerza (service nuevo, p. ej. `score_service.py`)
 
-- [ ] **1RM proyectado (Epley)** `peso × (1 + reps/30)` por ejercicio, mejor registro de **últimos 3 meses**. Reutilizar `top_set_value`/`parse_numeric` para extraer peso y reps de `logged_sets`.
-- [ ] **Emparejar peso corporal por fecha** del registro contra `Progress.weight` (fallback a `Questionnaire.weight` si no hay histórico).
-- [ ] **Fuerza relativa** = 1RM / peso_corporal.
-- [ ] **Score por grupo muscular** = lookup estándar con `max(fuerza_relativa)` del grupo, ajustado por género y edad.
-- [ ] **Score total fuerza** = **mediana** de grupos con datos (decisión 18-jun, igual que Gravl); grupos sin datos → `—`, fuera del cálculo.
-- [ ] `*` + nota *"basado en X de 7 grupos musculares"* cuando faltan grupos.
-- [ ] Filtrar ejercicios de **máquina** y los no mapeados a grupo.
-- [ ] Mapear score → **nivel** (Principiante → Olímpico).
+> 🔨 **EN REVIEW — pendiente de confirmación de Carles (25-jun-2026).** Dos PRs **apilados**: [PR #126](https://github.com/carles-mallafre/metodo_api/pull/126) = fórmulas puras `app/services/score_math.py` (+18 tests) → `main`; [PR #127](https://github.com/carles-mallafre/metodo_api/pull/127) = `score_calculator.py` (calculadora pura, +10 tests) + `score_service.py` (lee la BD), **apilado sobre el #126**. Probado en local (PG17): demo hombre 30a/80kg → **134 "Experimentado"**. Se marca ✅ cuando Carles fusione.
+
+- [~] **1RM proyectado (Epley)** `peso × (1 + reps/30)` por ejercicio, mejor registro de **últimos 3 meses** (90 días). Reutiliza `parse_numeric`. → `score_math.projected_one_rep_max` + `score_calculator.best_projected_1rm` + ventana en `score_service`.
+- [~] **Peso corporal** contra `Progress.weight` (fallback a `Questionnaire.weight`). → `score_service._load_bodyweight`. **DECISIÓN (25-jun): peso ACTUAL** (último registrado), NO por-fecha — el snapshot ya guarda el peso usado, así que por-marca era redundante y más complejo.
+- [~] **Fuerza relativa** = 1RM / peso_corporal. → `score_math.relative_strength`.
+- [~] **Score por grupo muscular** = lookup estándar con `max(fuerza_relativa)` del grupo, ajustado por género y edad. → `score_calculator.compute_strength_score` + `score_math.score_from_ratio`/`age_coefficient`. Género `male/female`→`H/M`.
+- [~] **Score total fuerza** = **mediana** de grupos con datos (decisión 18-jun, igual que Gravl); grupos sin datos → `—`, fuera del cálculo. → `score_math.total_strength_score`.
+- [~] `*` + nota *"basado en X de 7 grupos musculares"* cuando faltan grupos. → el motor ya devuelve `groups_covered`/`total_groups`; el texto y el `*` se pintan en la app (§8).
+- [~] Filtrar ejercicios **no mapeados** a grupo. → resuelto por diseño: solo cuentan los 20 de `score_exercise_muscle_groups` (estar en la tabla = cuenta). "Máquina" no se filtra (el `equipment` es inservible; el catálogo curado ya los excluye).
+- [~] Mapear score → **nivel** (Principiante → Olímpico). → `score_math.level_name`.
 
 ## 4. Motor de cálculo — Running
 

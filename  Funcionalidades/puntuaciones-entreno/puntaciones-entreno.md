@@ -42,6 +42,8 @@ score_total = mediana(grupos_con_datos)
 Si algún grupo no tiene datos → muestra `—` en el desglose, no entra al cálculo.
 El score total lleva un `*` si hay grupos sin datos, con nota: "basado en X de 7 grupos musculares".
 
+**Confianza del score (decidido 23-jun-2026, con Kata):** se muestra el chip **"baja confianza"** mientras hay **1–3 grupos** con datos; **a partir de 4 grupos** (mayoría de 7) el score se considera fiable y se quita la etiqueta. El `*` "basado en X de 7" se mantiene hasta completar los 7. Razón: el total es la **mediana** de los grupos, que se estabiliza con mayoría. (Umbral antes indefinido.)
+
 ### Ajustes
 - **Género**: estándares separados para comparaciones justas
 - **Edad**: los estándares ajustan con la edad

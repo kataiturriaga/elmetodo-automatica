@@ -35,7 +35,7 @@ Recalcula todo y abre el dashboard en el navegador (tarda ~15 segundos).
   si faltara, cae a `user_pseudo_id` (dispositivo) y se marca como «anónimo».
 - 🔒 **PRIVACIDAD:** este HTML ahora contiene **nombres y emails reales** de usuarios (PII).
   No lo subas a git ni lo compartas públicamente. Recomendado: añadir
-  `automatica/north-star-dashboard.html` al `.gitignore` (el dashboard se regenera solo).
+  `north-star-dashboard.html` al `.gitignore` (el dashboard se regenera solo).
   El nombre/email se cruza con la API por `user_id` (endpoint `subscriptions/users`).
 - La semana en curso aparece baja/0 hasta que GA4 ingiere los datos del día (suele tardar
   unas horas).
@@ -61,7 +61,7 @@ Si Google da una key nueva: reemplaza `~/.config/elmetodo/automatica-v2.json` po
 cat ~/Library/Logs/elmetodo-northstar.log
 
 # refrescar ahora mismo desde terminal
-python3 ~/repos/elmetodo_auto/automatica/generar_north_star.py
+python3 ~/repos/elmetodo_auto/generar_north_star.py
 
 # pausar / reactivar la actualización automática
 launchctl bootout   gui/$(id -u)/com.elmetodo.northstar
