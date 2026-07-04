@@ -24,18 +24,23 @@ Esto posiciona al producto como **una herramienta seria de progreso medible**, n
 
 ## 2. Métrica de éxito
 
+> **Actualización (28-jun-2026) — el trial ahora es de las stores, no interno.** El trial interno (`zone1_trial` / `free_trial_started_at`) ya no se usa: hoy todo usuario real es `zone2_subscriber`. El "prueba gratis" lo gestionan Apple/Google (free trial de la suscripción). Implicaciones, **verificadas en código**:
+> - **El usuario en trial SÍ ve el score.** Durante el trial de store la API lo cuenta como suscripción activa (`has_active_iap`) → `zone2_subscriber` → acceso completo, incluido el tab de score ([`access_level.dart:41`](../../../elmetodo_app/lib/features/subscription/domain/entities/access_level.dart#L41), [`subscription_service.py:341`](../../../elmetodo_api/app/services/subscription_service.py#L341)). La palanca de conversión sigue intacta → **la métrica trial→pago se mantiene.**
+> - **Cambia de dónde se mide**, no qué se mide: NO de `free_trial_started_at`/`free_trial_expires_at` (muertos), sino de los datos de store — [`user_subscription.is_trial_period`](../../../elmetodo_api/app/models/user_subscription.py#L64) + eventos [`SubscriptionEvent`](../../../elmetodo_api/app/models/subscription_event.py#L15) (`trial_started` → `renewed` = convirtió; `cancelled`/`expired`/`trial_expired` antes de renovar = no convirtió). El dato existe → la métrica es medible.
+> - **La ventana es más corta:** el trial de store es **~3 días** (no 7). El "momento ajá" tiene que llegar aún antes. *Pendiente: confirmar la duración exacta configurada en App Store Connect / Play Console.*
+
 **Métrica primaria: conversión trial → pago (suscriptores que no cancelan tras el trial).**
 
-El éxito es que el score haga que más usuarios **paguen y se queden** tras el free trial. Dos formas equivalentes de leerlo, ambas medibles con datos que la API ya guarda (`free_trial_started_at` / `free_trial_expires_at` / `subscription_tier` / `has_ever_subscribed`):
+El éxito es que el score haga que más usuarios **paguen y se queden** tras el free trial. Dos formas equivalentes de leerlo, ambas medibles con datos de store (ver actualización arriba: eventos `SubscriptionEvent` + `user_subscription.is_trial_period`; los antiguos `free_trial_*` internos ya no aplican):
 
 - **Tasa de conversión trial→pago**: % de usuarios que entran al trial y acaban como suscriptores activos al expirar (no cancelan). Es la métrica más directa.
 - **Crecimiento neto de suscriptores**: altas de pago menos cancelaciones. Mismo fenómeno visto a nivel agregado.
 
 **Cómo se atribuye al score (no basta con mirar la cifra global):**
-- **Comparación de cohortes vía feature flag** (la API ya soporta feature flags): conversión trial→pago de la cohorte que **ve el score durante el trial** vs cohorte de control sin él.
+- **Comparación de cohortes vía feature flag** (la API ya soporta feature flags): conversión trial→pago de la cohorte que **ve el score durante el trial de store** vs cohorte de control sin él. La conversión se lee de los eventos de store (`trial_started` → `renewed`), no de campos internos.
 - **Objetivo (hipótesis a calibrar con baseline real, no número inventado):** *uplift* relativo de la conversión en la cohorte con score. El umbral se fija al medir la baseline de conversión actual; sin esa baseline cualquier cifra sería falsa.
 
-> **Restricción de diseño crítica — la ventana del trial son 7 días.** Si la conversión es la métrica, el score tiene que **entregar valor percibido dentro del trial** (`free_trial_expires_at` = inicio + 7). Esto choca con el spec: el running necesita ~3 meses de datos y la fuerza necesita varios logs para estabilizarse. Un score que solo brilla a los 2 meses **no mueve la conversión**. Implicación: en el MVP el score debe dar una **primera lectura útil con muy pocos datos** (ej: estimar nivel desde el primer entreno de fuerza logueado, aunque sea con baja confianza), priorizando el "momento ajá" temprano sobre la precisión total.
+> **Restricción de diseño crítica — la ventana del trial es ~3 días (trial de store).** Si la conversión es la métrica, el score tiene que **entregar valor percibido dentro del trial de store** (~3 días, aún más corto que los 7 que asumíamos antes — confirmar duración exacta). Esto choca con el spec: el running necesita ~3 meses de datos y la fuerza necesita varios logs para estabilizarse. Un score que solo brilla a los 2 meses **no mueve la conversión**. Implicación: en el MVP el score debe dar una **primera lectura útil con muy pocos datos** (ej: estimar nivel desde el primer entreno de fuerza logueado, aunque sea con baja confianza), priorizando el "momento ajá" temprano sobre la precisión total.
 
 **Métricas secundarias (mecanismo — explican *por qué* convierte o no):**
 - **Engagement con el score durante el trial**: % de usuarios en trial que abren la pantalla de score. Si no lo miran antes de que expire el trial, no puede influir en la decisión de pago.
@@ -108,4 +113,4 @@ Si la apuesta es **diferenciación medida por conversión trial→pago**, la des
 - [ ] **Baseline de conversión trial→pago**: medir la tasa actual antes de lanzar para poder fijar el umbral de éxito real (uplift).
 - [ ] **Mínimo de datos para un primer score** dentro del trial: ¿con cuántos entrenos/ejercicios logueados mostramos una primera lectura, y cómo la marcamos como provisional? Decisión que condiciona si el score puede mover la conversión.
 - [ ] **Framing anti-desmotivación**: definir con diseño cómo se presenta un score bajo sin ahuyentar al usuario (y sin disparar cancelación en el trial).
-- [ ] **¿Visible en el trial o solo tras pagar?** Si la métrica es conversión, el score debe verse **durante** el trial (es la palanca). Confirmar que no queda detrás del paywall.
+- [x] **¿Visible en el trial o solo tras pagar?** → RESUELTO (28-jun, verificado en código): el trial es de store y cuenta como `zone2_subscriber`, que ya tiene acceso completo. El score **se ve durante el trial automáticamente**, sin gating extra. No queda detrás del paywall.

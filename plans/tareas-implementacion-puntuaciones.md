@@ -66,14 +66,14 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 
 > 🔨 **EN REVIEW — pendiente de confirmación de Carles (25-jun-2026).** Dos PRs **apilados**: [PR #126](https://github.com/carles-mallafre/metodo_api/pull/126) = fórmulas puras `app/services/score_math.py` (+18 tests) → `main`; [PR #127](https://github.com/carles-mallafre/metodo_api/pull/127) = `score_calculator.py` (calculadora pura, +10 tests) + `score_service.py` (lee la BD), **apilado sobre el #126**. Probado en local (PG17): demo hombre 30a/80kg → **134 "Experimentado"**. Se marca ✅ cuando Carles fusione.
 
-- [~] **1RM proyectado (Epley)** `peso × (1 + reps/30)` por ejercicio, mejor registro de **últimos 3 meses** (90 días). Reutiliza `parse_numeric`. → `score_math.projected_one_rep_max` + `score_calculator.best_projected_1rm` + ventana en `score_service`.
-- [~] **Peso corporal** contra `Progress.weight` (fallback a `Questionnaire.weight`). → `score_service._load_bodyweight`. **DECISIÓN (25-jun): peso ACTUAL** (último registrado), NO por-fecha — el snapshot ya guarda el peso usado, así que por-marca era redundante y más complejo.
-- [~] **Fuerza relativa** = 1RM / peso_corporal. → `score_math.relative_strength`.
-- [~] **Score por grupo muscular** = lookup estándar con `max(fuerza_relativa)` del grupo, ajustado por género y edad. → `score_calculator.compute_strength_score` + `score_math.score_from_ratio`/`age_coefficient`. Género `male/female`→`H/M`.
-- [~] **Score total fuerza** = **mediana** de grupos con datos (decisión 18-jun, igual que Gravl); grupos sin datos → `—`, fuera del cálculo. → `score_math.total_strength_score`.
-- [~] `*` + nota *"basado en X de 7 grupos musculares"* cuando faltan grupos. → el motor ya devuelve `groups_covered`/`total_groups`; el texto y el `*` se pintan en la app (§8).
-- [~] Filtrar ejercicios **no mapeados** a grupo. → resuelto por diseño: solo cuentan los 20 de `score_exercise_muscle_groups` (estar en la tabla = cuenta). "Máquina" no se filtra (el `equipment` es inservible; el catálogo curado ya los excluye).
-- [~] Mapear score → **nivel** (Principiante → Olímpico). → `score_math.level_name`.
+- [x] **1RM proyectado (Epley)** `peso × (1 + reps/30)` por ejercicio, mejor registro de **últimos 3 meses** (90 días). Reutiliza `parse_numeric`. → `score_math.projected_one_rep_max` + `score_calculator.best_projected_1rm` + ventana en `score_service`.
+- [x] **Peso corporal** contra `Progress.weight` (fallback a `Questionnaire.weight`). → `score_service._load_bodyweight`. **DECISIÓN (25-jun): peso ACTUAL** (último registrado), NO por-fecha — el snapshot ya guarda el peso usado, así que por-marca era redundante y más complejo.
+- [x] **Fuerza relativa** = 1RM / peso_corporal. → `score_math.relative_strength`.
+- [x] **Score por grupo muscular** = lookup estándar con `max(fuerza_relativa)` del grupo, ajustado por género y edad. → `score_calculator.compute_strength_score` + `score_math.score_from_ratio`/`age_coefficient`. Género `male/female`→`H/M`.
+- [x] **Score total fuerza** = **mediana** de grupos con datos (decisión 18-jun, igual que Gravl); grupos sin datos → `—`, fuera del cálculo. → `score_math.total_strength_score`.
+- [x] `*` + nota *"basado en X de 7 grupos musculares"* cuando faltan grupos. → el motor ya devuelve `groups_covered`/`total_groups`; el texto y el `*` se pintan en la app (§8).
+- [x] Filtrar ejercicios **no mapeados** a grupo. → resuelto por diseño: solo cuentan los 20 de `score_exercise_muscle_groups` (estar en la tabla = cuenta). "Máquina" no se filtra (el `equipment` es inservible; el catálogo curado ya los excluye).
+- [x] Mapear score → **nivel** (Principiante → Olímpico). → `score_math.level_name`.
 
 ## 4. Motor de cálculo — Running
 
@@ -93,6 +93,8 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 ## 6. Sesiones de evaluación — solución cold-start
 
 > Ver [vision-producto-puntuaciones.md](vision-producto-puntuaciones.md) §5. Lo que hace que el score se pueble dentro del trial.
+>
+> ⚠️ **Actualización (28-jun-2026):** el trial ahora es de las stores (~3 días), no interno de 7. El usuario en trial entra como `zone2_subscriber` y **sí ve el score** (no hay gating que tocar — ver visión §2). Pero la ventana es más corta → el cold-start es **más urgente**, no menos: el "momento ajá" debe caber en ~3 días. La conversión trial→pago se mide desde eventos de store (`SubscriptionEvent`: `trial_started` → `renewed`), no desde `free_trial_*`.
 
 - [ ] **Diseñar el bloque de evaluación de fuerza** (contenido): 1–2 sesiones iniciales que incluyan ≥1 ejercicio válido por cada uno de los 7 grupos musculares, con **series de trabajo submáximas** (no 1RM a fallo). Insertarlo al inicio de los programas de fuerza del MVP.
 - [ ] **Test ligero de running de inicio** (contenido): proxy corto escalado al nivel del programa (time-trial 1–2 km o test 12 min) que dé un pace de arranque. El Test completo del spec se mantiene al final.
@@ -103,18 +105,22 @@ Plan end-to-end para implementar el sistema descrito en [puntaciones-entreno.md]
 
 ## 7. API — Endpoints (mobile)
 
-- [ ] `GET /score` (o dentro de training): Score Total + sub-scores + desglose + nota de cobertura + nivel.
-- [ ] `GET /score/history` con ventanas 1 mes / 6 meses / 1 año / Todo.
-- [ ] Schemas Pydantic (mismo patrón que `app/schemas/marcas.py`).
-- [ ] Tests de integración (DB real, auth real, header `X-Client-ID`).
+> 🔨 **EN REVIEW — pendiente de aprobación de Carles (29-jun-2026).** [PR #129](https://github.com/carles-mallafre/metodo_api/pull/129) (rama `feat/puntuaciones-endpoints-score`). `GET /score` (calcula + backfill lazy histórico 12 meses) + `GET /score/history?window=1m|6m|1y|all`. Schemas Pydantic en `app/schemas/score.py`. 11 tests de integración. El CI sale en rojo por el fallo preexistente del entorno (igual que siempre).
+
+- [x] `GET /score` (o dentro de training): Score Total + sub-scores + desglose + nota de cobertura + nivel.
+- [x] `GET /score/history` con ventanas 1 mes / 6 meses / 1 año / Todo.
+- [x] Schemas Pydantic (mismo patrón que `app/schemas/marcas.py`).
+- [x] Tests de integración (DB real, auth real, header `X-Client-ID`).
 
 ## 8. App Flutter (`lib/features/...`)
 
-- [ ] **Dos tabs en la pantalla de Entreno**: *Programa* (lo actual) y *Puntuaciones* (este feature). El tab Puntuaciones aloja score + desgloses + historial.
+> 🔨 **EN REVIEW — pendiente de aprobación de Carles (29-jun-2026).** [PR #1](https://github.com/carles-mallafre/elmetodo_app/pull/1) (rama `feat/puntuaciones-ui-flujo-score`). UI completa del flujo con datos demo: pantalla principal (hero + gráfico embebido + grid 2 columnas por grupo) → detalle de grupo → detalle de ejercicio. Pestaña "Seguimiento" en main_entreno_screen. Pendiente de conectar a la API real una vez Carles apruebe ambos PRs.
+
+- [x] **Dos tabs en la pantalla de Entreno**: *Programa* (lo actual) y *Puntuaciones* (este feature). El tab Puntuaciones aloja score + desgloses + historial.
 - [ ] Capa data/domain (Freezed models + provider Riverpod) consumiendo los endpoints de score.
-- [ ] **Pantalla principal**: Score Total con `*` y nota de cobertura + nivel.
-- [ ] **Historial**: 1 mes / 6 meses / 1 año / Todo (gráfica — reutilizar el chart de marcas si encaja).
-- [ ] **Desglose fuerza**: grupo muscular → ejercicio.
+- [x] **Pantalla principal**: Score Total con `*` y nota de cobertura + nivel.
+- [x] **Historial**: 1 mes / 6 meses / 1 año / Todo (gráfica fl_chart embebida).
+- [x] **Desglose fuerza**: grupo muscular → ejercicio.
 - [ ] **Desglose running**: por zona (VO2max, umbral, base).
 - [ ] **Resumen semanal**: vs semana anterior, grupos/zonas que subieron/bajaron, aviso de registros expirados.
 - [ ] Estados vacíos / baja confianza / "aún no hay datos suficientes".

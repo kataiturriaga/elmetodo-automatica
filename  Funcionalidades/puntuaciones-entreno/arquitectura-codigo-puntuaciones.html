@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arquitectura del código — Puntuaciones de Entrenamiento</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --ink:#e8eaed; --muted:#9aa4b2;
+    --routing:#3b82f6; --schema:#a855f7; --service:#f59e0b; --calc:#10b981;
+    --math:#14b8a6; --db:#ef4444; --flutter:#ec4899; --line:#3a4150;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5; padding:40px 24px 80px;
+  }
+  h1{font-size:26px; margin:0 0 4px}
+  h2{font-size:20px; margin:56px 0 6px; padding-bottom:8px; border-bottom:1px solid var(--line)}
+  .sub{color:var(--muted); font-size:14px; margin:0 0 8px}
+  .wrap{max-width:1180px; margin:0 auto}
+  .legend{display:flex; flex-wrap:wrap; gap:10px; margin:18px 0 8px}
+  .chip{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted)}
+  .dot{width:12px; height:12px; border-radius:3px}
+
+  /* ---------- Diagrama alto nivel ---------- */
+  .flow{display:flex; align-items:stretch; gap:0; flex-wrap:wrap; margin-top:20px}
+  .layer{
+    flex:1; min-width:150px; background:var(--panel); border-radius:14px;
+    padding:16px 14px; border:1px solid var(--line); position:relative;
+  }
+  .layer h3{margin:0 0 6px; font-size:15px}
+  .layer p{margin:0; font-size:12.5px; color:var(--muted)}
+  .layer .tag{font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:700; display:block; margin-bottom:4px}
+  .arrow{
+    align-self:center; flex:0 0 34px; text-align:center; color:var(--muted);
+    font-size:24px; user-select:none;
+  }
+  @media(max-width:900px){ .flow{flex-direction:column} .arrow{transform:rotate(90deg); flex-basis:24px} }
+
+  /* ---------- Diagrama detallado ---------- */
+  .cols{display:grid; grid-template-columns:1fr; gap:16px; margin-top:22px}
+  .band{
+    background:var(--panel); border:1px solid var(--line); border-left-width:5px;
+    border-radius:12px; padding:16px 18px;
+  }
+  .band .bandhead{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:4px}
+  .band .num{
+    font-size:12px; font-weight:800; color:#0f1115; background:var(--muted);
+    border-radius:20px; padding:1px 9px;
+  }
+  .band h3{margin:0; font-size:16px}
+  .band .what{color:var(--muted); font-size:13px; margin:2px 0 14px}
+  .files{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px}
+  .file{background:#0f131a; border:1px solid var(--line); border-radius:10px; padding:12px 13px}
+  .file .fname{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; font-weight:700; margin-bottom:2px}
+  .file .frole{color:var(--muted); font-size:12px; margin-bottom:9px}
+  .file ul{margin:0; padding-left:0; list-style:none}
+  .file li{font-size:12.5px; padding:3px 0 3px 16px; position:relative; border-top:1px dashed #232a35}
+  .file li:first-child{border-top:none}
+  .file li::before{content:"›"; position:absolute; left:2px; color:var(--muted)}
+  .file li code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11.5px; color:#cbd5e1}
+  .file li .desc{color:var(--muted)}
+  .newbadge{font-size:10px; font-weight:700; color:#10b981; border:1px solid #10b981; border-radius:5px; padding:0 5px; margin-left:6px; vertical-align:middle}
+
+  .flowline{color:var(--muted); font-size:12px; text-align:center; padding:6px 0}
+  .conn{background:#12161d; border:1px dashed var(--line); border-radius:10px; padding:14px 16px; margin-top:14px}
+  .conn b{color:var(--ink)}
+  .conn ol{margin:8px 0 0; padding-left:20px}
+  .conn li{font-size:13px; margin:5px 0; color:var(--muted)}
+  .conn li b{color:var(--ink)}
+  .pending{opacity:.85}
+  .pending .band{border-style:dashed}
+  .note{font-size:12px; color:var(--muted); margin-top:6px}
+  .kbd{font-family:ui-monospace,monospace; background:#0f131a; border:1px solid var(--line); border-radius:4px; padding:0 5px; font-size:11.5px}
+
+  /* ---------- Mapa global (SVG) ---------- */
+  .graphwrap{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:10px; margin-top:20px; overflow-x:auto}
+  .graphwrap svg{width:100%; min-width:760px; height:auto; display:block}
+  .nodefile{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-weight:700}
+  .noderole{fill:var(--muted)}
+  .edgelabel{fill:var(--muted); font-size:11px; font-family:-apple-system,sans-serif}
+
+  /* ---------- Recorridos por acción ---------- */
+  .route{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-top:16px; border-left-width:5px}
+  .route .rhead{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:2px}
+  .route h3{margin:0; font-size:16px}
+  .route .rurl{font-family:ui-monospace,monospace; font-size:12px; color:var(--muted); background:#0f131a; border:1px solid var(--line); border-radius:5px; padding:1px 7px}
+  .route .rwhat{color:var(--muted); font-size:13px; margin:2px 0 14px}
+  .chain{display:flex; flex-wrap:wrap; align-items:stretch; gap:0; margin-bottom:12px}
+  .cnode{background:#0f131a; border:1px solid var(--line); border-top-width:3px; border-radius:9px; padding:8px 11px; min-width:120px; max-width:210px}
+  .cnode .cf{font-family:ui-monospace,monospace; font-size:11.5px; font-weight:700; display:block}
+  .cnode .cd{color:var(--muted); font-size:11px; display:block; margin-top:2px}
+  .carrow{align-self:center; flex:0 0 26px; text-align:center; color:var(--muted); font-size:18px; user-select:none}
+  .rdb{font-size:12px; color:var(--muted); border-top:1px dashed var(--line); padding-top:9px; margin-top:2px}
+  .rdb b{color:var(--ink)}
+  .rdb code{font-family:ui-monospace,monospace; font-size:11px; color:#cbd5e1; background:#0f131a; border:1px solid var(--line); border-radius:4px; padding:0 5px; margin:0 2px; display:inline-block}
+  @media(max-width:760px){ .chain{flex-direction:column} .carrow{transform:rotate(90deg); flex-basis:20px} .cnode{max-width:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>🏗️ Arquitectura del código — Puntuaciones de Entrenamiento</h1>
+  <p class="sub">Cómo está montada la feature del Score de Fuerza en el backend (<span class="kbd">elmetodo_api</span>) y qué falta en la app (<span class="kbd">elmetodo_app</span>). Actualizado tras la PR #130.</p>
+
+  <div class="legend">
+    <span class="chip"><span class="dot" style="background:var(--routing)"></span>Entrada / Endpoints</span>
+    <span class="chip"><span class="dot" style="background:var(--schema)"></span>Contrato (Schemas)</span>
+    <span class="chip"><span class="dot" style="background:var(--service)"></span>Orquestación (Service)</span>
+    <span class="chip"><span class="dot" style="background:var(--calc)"></span>Cálculo</span>
+    <span class="chip"><span class="dot" style="background:var(--math)"></span>Fórmulas</span>
+    <span class="chip"><span class="dot" style="background:var(--db)"></span>Base de datos</span>
+    <span class="chip"><span class="dot" style="background:var(--flutter)"></span>App Flutter (pendiente)</span>
+  </div>
+
+  <!-- ============ DIAGRAMA 1 — ALTO NIVEL ============ -->
+  <h2>1 · Vista de alto nivel</h2>
+  <p class="sub">La idea en 6 pasos: la app pregunta, el backend lee datos, calcula y responde.</p>
+
+  <div class="flow">
+    <div class="layer" style="border-top:4px solid var(--flutter)">
+      <span class="tag" style="color:var(--flutter)">App</span>
+      <h3>📱 elmetodo_app</h3>
+      <p>La pantalla de Puntuaciones pide los datos por internet.</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="layer" style="border-top:4px solid var(--routing)">
+      <span class="tag" style="color:var(--routing)">Entrada</span>
+      <h3>🚪 score.py<br>(endpoints)</h3>
+      <p>Recibe la petición y decide a quién llamar. 4 puertas.</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="layer" style="border-top:4px solid var(--service)">
+      <span class="tag" style="color:var(--service)">Cerebro</span>
+      <h3>🧠 score_service.py</h3>
+      <p>Lee la base de datos y coordina todo el cálculo.</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="layer" style="border-top:4px solid var(--calc)">
+      <span class="tag" style="color:var(--calc)">Cálculo</span>
+      <h3>🧮 calculator<br>+ math</h3>
+      <p>Aplica las fórmulas puras (1RM, niveles, mediana).</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="layer" style="border-top:4px solid var(--db)">
+      <span class="tag" style="color:var(--db)">Datos</span>
+      <h3>🗄️ Base de datos</h3>
+      <p>Marcas, pesos, cuestionario, snapshots, estándares.</p>
+    </div>
+  </div>
+  <p class="note">↩︎ La respuesta vuelve por el mismo camino: el <b>service</b> arma el resultado, el <b>schema</b> comprueba que los nombres de los campos están bien, y <b>score.py</b> se lo devuelve a la app.</p>
+
+  <!-- ============ DIAGRAMA 2 — DETALLE ============ -->
+  <h2>2 · Vista detallada (archivo por archivo, función por función)</h2>
+  <p class="sub">De arriba (lo que toca la app) hacia abajo (lo más puro y matemático).</p>
+
+  <div class="cols">
+
+    <!-- CAPA 1 -->
+    <div class="band" style="border-left-color:var(--routing)">
+      <div class="bandhead"><span class="num" style="background:var(--routing)">1</span><h3>Entrada — los endpoints (las "puertas" de la API)</h3></div>
+      <p class="what">Es lo único que la app conoce. Cada endpoint recibe la petición, llama al cerebro (service) y devuelve la respuesta ya validada.</p>
+      <div class="files">
+        <div class="file" style="border-top:3px solid var(--routing)">
+          <div class="fname">app/api/routes/mobile/score.py</div>
+          <div class="frole">Define las 4 URLs y qué hace cada una.</div>
+          <ul>
+            <li><code>GET /score</code> <span class="desc">— score total + resumen por grupo. En la 1ª llamada dispara el <i>backfill</i> (rellena el histórico) y guarda un snapshot.</span></li>
+            <li><code>GET /score/history</code> <span class="desc">— la serie para la gráfica de fuerza total (1m/6m/1y/all).</span></li>
+            <li><code>GET /score/groups/{grupo}</code> <span class="desc">— detalle de un grupo: ejercicios, delta 3 meses e historial.</span></li>
+            <li><code>GET /score/exercises/{id}</code> <span class="desc">— detalle de un ejercicio: mejor marca, PRs y gráfica en kg.</span></li>
+          </ul>
+        </div>
+        <div class="file" style="border-top:3px solid var(--routing)">
+          <div class="fname">app/api/router.py</div>
+          <div class="frole">El "cuadro de fusibles" de toda la API.</div>
+          <ul>
+            <li><span class="desc">Registra el grupo de rutas de score bajo el prefijo</span> <code>/score</code> <span class="desc">para que existan.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="flowline">▼ &nbsp; llama a &nbsp; ▼</div>
+
+    <!-- CAPA 2 -->
+    <div class="band" style="border-left-color:var(--schema)">
+      <div class="bandhead"><span class="num" style="background:var(--schema)">2</span><h3>Contrato — la forma de los datos (Schemas)</h3></div>
+      <p class="what">Son las "plantillas" que describen exactamente qué campos y con qué nombre salen hacia la app. Si el service arma un dato con un nombre que no cuadra, aquí salta el error (fue justo el bug del <code>total_score</code>).</p>
+      <div class="files">
+        <div class="file" style="border-top:3px solid var(--schema)">
+          <div class="fname">app/schemas/score.py</div>
+          <div class="frole">Todas las plantillas de respuesta.</div>
+          <ul>
+            <li><code>ScoreResponse</code> <span class="desc">— respuesta de <code>GET /score</code> (total, nivel, peso, weekly_delta, lista de grupos).</span></li>
+            <li><code>ScoreGroupDetail</code> <span class="desc">— cada grupo dentro del resumen (score, nivel, progress_pct, points_to_next).</span></li>
+            <li><code>ScoreHistoryPoint</code> <span class="desc">— un punto de gráfica en <b>score 0–300</b> (<code>total_score</code>).</span></li>
+            <li><code>GroupDetailResponse</code> <span class="desc">— detalle de grupo (ejercicios + historial + delta_3m).</span></li>
+            <li><code>ExerciseInGroup</code> <span class="desc">— un ejercicio dentro de un grupo (mejor marca, si es "ancla").</span></li>
+            <li><code>ExerciseDetailResponse</code> <span class="desc">— detalle de ejercicio (PRs + gráfica).</span></li>
+            <li><code>PrRecord</code> <span class="desc">— un récord: "85 kg × 4" y su 1RM proyectado.</span></li>
+            <li><code>OneRmPoint</code> <span class="newbadge">NUEVO</span><span class="desc">— punto de gráfica en <b>kg</b> (<code>one_rm</code>). Distinto del anterior a propósito.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="flowline">▼ &nbsp; el endpoint pide los datos al &nbsp; ▼</div>
+
+    <!-- CAPA 3 -->
+    <div class="band" style="border-left-color:var(--service)">
+      <div class="bandhead"><span class="num" style="background:var(--service)">3</span><h3>Orquestación — el cerebro (Service)</h3></div>
+      <p class="what">El único que habla con la base de datos. Lee los datos reales del usuario, se los pasa a la calculadora, guarda/lee las fotos históricas (snapshots) y arma cada respuesta.</p>
+      <div class="files">
+        <div class="file" style="border-top:3px solid var(--service)">
+          <div class="fname">app/services/score_service.py</div>
+          <div class="frole">Lectura de BD + coordinación. Es el archivo más grande.</div>
+          <ul>
+            <li><code>get_user_strength_score()</code> <span class="desc">— calcula el score de HOY (o de una fecha pasada).</span></li>
+            <li><code>group_detail()</code> <span class="desc">— arma el detalle de un grupo muscular.</span></li>
+            <li><code>exercise_detail()</code> <span class="desc">— arma el detalle de un ejercicio (mejor marca, PRs, delta).</span></li>
+            <li><code>weekly_delta()</code> <span class="desc">— cuánto ha subido el score en 7 días.</span></li>
+            <li><code>save_snapshot()</code> <span class="desc">— guarda una foto del score (sin duplicar en el mismo día).</span></li>
+            <li><code>backfill_snapshots()</code> <span class="desc">— reconstruye 12 meses de histórico la 1ª vez.</span></li>
+            <li><code>get_history()</code> <span class="desc">— saca la serie de la gráfica de fuerza total.</span></li>
+            <li><code>_exercise_1rm_history()</code> <span class="newbadge">NUEVO</span><span class="desc">— progresión mensual del 1RM en kg de un ejercicio.</span></li>
+            <li><code>_load_bodyweight / _load_demographics / _load_best_1rm_by_exercise</code> <span class="desc">— lectores de peso, edad/género y mejores marcas.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="flowline">▼ &nbsp; delega el cálculo puro en &nbsp; ▼</div>
+
+    <!-- CAPA 4 -->
+    <div class="band" style="border-left-color:var(--calc)">
+      <div class="bandhead"><span class="num" style="background:var(--calc)">4</span><h3>Cálculo — combinar datos con estándares</h3></div>
+      <p class="what">No toca la base de datos. Recibe datos ya leídos y produce el score. Se puede probar de forma aislada (por eso tiene tantos tests).</p>
+      <div class="files">
+        <div class="file" style="border-top:3px solid var(--calc)">
+          <div class="fname">app/services/score_calculator.py</div>
+          <div class="frole">Junta las marcas con los estándares → score por grupo y total.</div>
+          <ul>
+            <li><code>compute_strength_score()</code> <span class="desc">— score de cada grupo (mejor ejercicio) + total (mediana de los grupos).</span></li>
+            <li><code>best_projected_1rm()</code> <span class="desc">— de una lista de series, el mejor 1RM estimado.</span></li>
+            <li><code>gender_to_code() / age_from_birthdate()</code> <span class="desc">— traduce datos del cuestionario.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="flowline">▼ &nbsp; que a su vez usa las fórmulas de &nbsp; ▼</div>
+
+    <!-- CAPA 5 -->
+    <div class="band" style="border-left-color:var(--math)">
+      <div class="bandhead"><span class="num" style="background:var(--math)">5</span><h3>Fórmulas — la matemática pura</h3></div>
+      <p class="what">El nivel más bajo: solo números entran, números salen. Ninguna dependencia. Aquí viven las decisiones de "cómo se mide la fuerza".</p>
+      <div class="files">
+        <div class="file" style="border-top:3px solid var(--math)">
+          <div class="fname">app/services/score_math.py</div>
+          <div class="frole">Fórmulas y tabla de niveles.</div>
+          <ul>
+            <li><code>projected_one_rep_max()</code> <span class="desc">— fórmula de Epley (peso + reps → 1RM).</span></li>
+            <li><code>relative_strength()</code> <span class="desc">— fuerza en relación al peso corporal.</span></li>
+            <li><code>age_coefficient()</code> <span class="desc">— ajuste por edad.</span></li>
+            <li><code>score_from_ratio()</code> <span class="desc">— convierte la fuerza relativa en un score 0–300.</span></li>
+            <li><code>total_strength_score()</code> <span class="desc">— la mediana de los grupos.</span></li>
+            <li><code>level_name()</code> <span class="desc">— nombre del nivel (Principiante → Olímpico).</span></li>
+            <li><code>progress_within_level()</code> <span class="newbadge">NUEVO</span><span class="desc">— % dentro del nivel + puntos para el siguiente.</span></li>
+            <li><code>LEVELS</code> <span class="desc">— la tabla de umbrales (0, 50, 100, …, 300).</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="flowline">▲ &nbsp; y todo se apoya en las tablas de la &nbsp; ▲</div>
+
+    <!-- CAPA 6 -->
+    <div class="band" style="border-left-color:var(--db)">
+      <div class="bandhead"><span class="num" style="background:var(--db)">6</span><h3>Base de datos — de dónde salen los datos reales</h3></div>
+      <p class="what">Tablas que el service lee (y en un caso, escribe). Cada una es un modelo en <code>app/models/</code>.</p>
+      <div class="files">
+        <div class="file" style="border-top:3px solid var(--db)">
+          <div class="fname">score_snapshot</div>
+          <div class="frole">Fotos del score a lo largo del tiempo.</div>
+          <ul><li><span class="desc">Alimenta las gráficas. La <b>escribe</b> el service (única tabla que escribe).</span></li></ul>
+        </div>
+        <div class="file" style="border-top:3px solid var(--db)">
+          <div class="fname">score_exercise_muscle_group</div>
+          <div class="frole">Catálogo curado.</div>
+          <ul><li><span class="desc">Qué ejercicios cuentan para el score y a qué grupo van (y cuál es el "ancla").</span></li></ul>
+        </div>
+        <div class="file" style="border-top:3px solid var(--db)">
+          <div class="fname">strength_standard</div>
+          <div class="frole">Los baremos.</div>
+          <ul><li><span class="desc">Tablas de referencia (estilo StrengthLevel) por grupo y género.</span></li></ul>
+        </div>
+        <div class="file" style="border-top:3px solid var(--db)">
+          <div class="fname">user_exercise_log</div>
+          <div class="frole">Las marcas del usuario.</div>
+          <ul><li><span class="desc">Cada serie registrada (peso × reps). La materia prima del 1RM.</span></li></ul>
+        </div>
+        <div class="file" style="border-top:3px solid var(--db)">
+          <div class="fname">training_day_exercise_v2</div>
+          <div class="frole">Puente marca ↔ ejercicio.</div>
+          <ul><li><span class="desc">Une cada log con el ejercicio concreto que se hizo.</span></li></ul>
+        </div>
+        <div class="file" style="border-top:3px solid var(--db)">
+          <div class="fname">questionnaire / progress</div>
+          <div class="frole">Datos del usuario.</div>
+          <ul><li><span class="desc">Género, edad y peso corporal (actual e histórico).</span></li></ul>
+        </div>
+        <div class="file" style="border-top:3px solid var(--db)">
+          <div class="fname">exercise</div>
+          <div class="frole">Catálogo general.</div>
+          <ul><li><span class="desc">El nombre de cada ejercicio ("Press banca").</span></li></ul>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /cols -->
+
+  <!-- RECORRIDO DE EJEMPLO -->
+  <div class="conn">
+    <b>🔎 Ejemplo de recorrido completo — abrir la pantalla de un ejercicio:</b>
+    <ol>
+      <li>La app llama a <b><code>GET /score/exercises/5</code></b> → entra por <b>score.py</b>.</li>
+      <li><b>score.py</b> llama a <b><code>score_service.exercise_detail()</code></b>.</li>
+      <li>El <b>service</b> lee de la BD: comprueba en <b>score_exercise_muscle_group</b> que el ejercicio cuenta, saca su nombre de <b>exercise</b>, y sus marcas de <b>user_exercise_log</b> + <b>training_day_exercise_v2</b>.</li>
+      <li>Para cada sesión llama a <b><code>score_calculator.best_projected_1rm()</code></b>, que usa <b><code>score_math.projected_one_rep_max()</code></b> (Epley).</li>
+      <li><b><code>_exercise_1rm_history()</code></b> arma la gráfica en kg mes a mes.</li>
+      <li>El <b>service</b> devuelve un diccionario; <b>score.py</b> lo mete en la plantilla <b><code>ExerciseDetailResponse</code></b> (que valida los nombres) y lo envía a la app.</li>
+    </ol>
+  </div>
+
+  <!-- CAPA FLUTTER PENDIENTE -->
+  <h2>3 · Lado app (Flutter) — todavía por construir</h2>
+  <p class="sub">Los endpoints ya existen; falta que la app los consuma en vez de usar datos de ejemplo.</p>
+  <div class="cols pending">
+    <div class="band" style="border-left-color:var(--flutter)">
+      <div class="bandhead"><span class="num" style="background:var(--flutter)">4</span><h3>elmetodo_app · features/puntuaciones/ (pendiente)</h3></div>
+      <p class="what">Misma estructura por capas que la feature de ranking que ya existe en la app.</p>
+      <div class="files">
+        <div class="file" style="border-top:3px solid var(--flutter)">
+          <div class="fname">domain/entities/score_entities.dart</div>
+          <div class="frole">Las "cajas" de datos en la app.</div>
+          <ul><li><span class="desc">ScoreData, ScoreGroup, GroupDetail, ExerciseDetail, PrRecord… (espejo de los schemas).</span></li></ul>
+        </div>
+        <div class="file" style="border-top:3px solid var(--flutter)">
+          <div class="fname">data/repositories/score_repository_impl.dart</div>
+          <div class="frole">El "mensajero".</div>
+          <ul><li><span class="desc">Llama a los 4 endpoints por internet (Dio) y traduce el JSON a las cajas de arriba.</span></li></ul>
+        </div>
+        <div class="file" style="border-top:3px solid var(--flutter)">
+          <div class="fname">presentation/providers/score_providers.dart</div>
+          <div class="frole">El "grifo" de datos.</div>
+          <ul><li><span class="desc">Riverpod: cada pantalla se "engancha" y recibe carga / error / datos.</span></li></ul>
+        </div>
+        <div class="file" style="border-top:3px solid var(--flutter)">
+          <div class="fname">presentation/screens/*.dart</div>
+          <div class="frole">Las pantallas.</div>
+          <ul><li><span class="desc">puntuacion / grupo_detalle / ejercicio_detalle — pintan los datos reales.</span></li></ul>
+        </div>
+      </div>
+      <p class="note">Flujo en la app: <b>pantalla</b> → <b>provider</b> → <b>repository</b> → 🌐 API → (vuelve) → <b>entities</b> → se pinta.</p>
+    </div>
+  </div>
+
+  <!-- ============ DIAGRAMA 4 — MAPA GLOBAL DE ARCHIVOS ============ -->
+  <h2>4 · Mapa de conexiones — archivo por archivo</h2>
+  <p class="sub">Los mismos archivos del backend, pero ahora viendo <b>quién llama a quién</b>. Sigue las flechas: cada una es "este archivo le pide algo a este otro".</p>
+
+  <div class="graphwrap">
+    <svg viewBox="0 0 1140 700" role="img" aria-label="Mapa de conexiones entre los archivos del backend">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9aa4b2"/>
+        </marker>
+      </defs>
+
+      <!-- ARISTAS (debajo de los nodos) -->
+      <!-- App -> score.py -->
+      <line x1="570" y1="66" x2="450" y2="108" stroke="#3a4150" stroke-width="2" marker-end="url(#ah)"/>
+      <text class="edgelabel" x="470" y="94">pide por internet</text>
+      <!-- score.py -> service -->
+      <line x1="450" y1="176" x2="520" y2="228" stroke="#3a4150" stroke-width="2" marker-end="url(#ah)"/>
+      <text class="edgelabel" x="352" y="208">llama al cerebro</text>
+      <!-- score.py -> schemas (valida) -->
+      <line x1="600" y1="143" x2="688" y2="143" stroke="#3a4150" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ah)"/>
+      <text class="edgelabel" x="606" y="132">valida la respuesta</text>
+      <!-- service -> calculator -->
+      <line x1="470" y1="306" x2="415" y2="358" stroke="#3a4150" stroke-width="2" marker-end="url(#ah)"/>
+      <text class="edgelabel" x="250" y="340">delega el cálculo</text>
+      <!-- calculator -> math -->
+      <line x1="410" y1="420" x2="410" y2="458" stroke="#3a4150" stroke-width="2" marker-end="url(#ah)"/>
+      <text class="edgelabel" x="420" y="444">usa las fórmulas</text>
+      <!-- service -> DB -->
+      <line x1="760" y1="278" x2="655" y2="420" stroke="#3a4150" stroke-width="2" marker-end="url(#ah)"/>
+      <text class="edgelabel" x="700" y="330">lee datos (y escribe snapshot)</text>
+
+      <!-- NODO: App -->
+      <rect x="460" y="20" width="220" height="46" rx="11" fill="#0f131a" stroke="#ec4899" stroke-width="1.5"/>
+      <text x="570" y="42" text-anchor="middle" fill="#e8eaed" font-size="13.5" class="nodefile">📱 elmetodo_app</text>
+      <text x="570" y="58" text-anchor="middle" font-size="11" class="noderole">la pantalla de Puntuaciones</text>
+
+      <!-- NODO: score.py -->
+      <rect x="300" y="110" width="300" height="66" rx="11" fill="#0f131a" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="450" y="136" text-anchor="middle" fill="#e8eaed" font-size="13" class="nodefile">score.py</text>
+      <text x="450" y="153" text-anchor="middle" font-size="11" class="noderole">las 4 puertas (endpoints)</text>
+      <text x="450" y="168" text-anchor="middle" font-size="10.5" class="noderole">/score · /history · /groups · /exercises</text>
+
+      <!-- NODO: schemas -->
+      <rect x="690" y="110" width="340" height="66" rx="11" fill="#0f131a" stroke="#a855f7" stroke-width="1.5"/>
+      <text x="860" y="136" text-anchor="middle" fill="#e8eaed" font-size="13" class="nodefile">schemas/score.py</text>
+      <text x="860" y="153" text-anchor="middle" font-size="11" class="noderole">las plantillas de la respuesta</text>
+      <text x="860" y="168" text-anchor="middle" font-size="10.5" class="noderole">comprueba que los campos cuadran</text>
+
+      <!-- NODO: service -->
+      <rect x="380" y="230" width="380" height="76" rx="11" fill="#0f131a" stroke="#f59e0b" stroke-width="1.5"/>
+      <text x="570" y="258" text-anchor="middle" fill="#e8eaed" font-size="13.5" class="nodefile">score_service.py</text>
+      <text x="570" y="276" text-anchor="middle" font-size="11" class="noderole">🧠 el cerebro: lee la BD y coordina</text>
+      <text x="570" y="292" text-anchor="middle" font-size="10.5" class="noderole">get_user_strength_score · group_detail · exercise_detail…</text>
+
+      <!-- NODO: calculator -->
+      <rect x="250" y="360" width="320" height="60" rx="11" fill="#0f131a" stroke="#10b981" stroke-width="1.5"/>
+      <text x="410" y="386" text-anchor="middle" fill="#e8eaed" font-size="13" class="nodefile">score_calculator.py</text>
+      <text x="410" y="404" text-anchor="middle" font-size="11" class="noderole">junta marcas + estándares → score</text>
+
+      <!-- NODO: math -->
+      <rect x="250" y="460" width="320" height="60" rx="11" fill="#0f131a" stroke="#14b8a6" stroke-width="1.5"/>
+      <text x="410" y="486" text-anchor="middle" fill="#e8eaed" font-size="13" class="nodefile">score_math.py</text>
+      <text x="410" y="504" text-anchor="middle" font-size="11" class="noderole">🧮 fórmulas puras (Epley, mediana, niveles)</text>
+
+      <!-- CONTENEDOR: Base de datos -->
+      <rect x="650" y="360" width="440" height="308" rx="12" fill="#12161d" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6 4"/>
+      <text x="670" y="384" fill="#ef4444" font-size="12.5" font-weight="700">🗄️ Base de datos (tablas que lee el cerebro)</text>
+      <g font-family="ui-monospace,monospace" font-size="11.5">
+        <rect x="670" y="396" width="400" height="30" rx="7" fill="#0f131a" stroke="#3a4150"/>
+        <text x="684" y="415" fill="#e8eaed">score_snapshot</text><text x="1056" y="415" text-anchor="end" fill="#9aa4b2" font-size="10">✎ escribe</text>
+        <rect x="670" y="432" width="400" height="30" rx="7" fill="#0f131a" stroke="#3a4150"/>
+        <text x="684" y="451" fill="#e8eaed">score_exercise_muscle_group</text>
+        <rect x="670" y="468" width="400" height="30" rx="7" fill="#0f131a" stroke="#3a4150"/>
+        <text x="684" y="487" fill="#e8eaed">strength_standard</text>
+        <rect x="670" y="504" width="400" height="30" rx="7" fill="#0f131a" stroke="#3a4150"/>
+        <text x="684" y="523" fill="#e8eaed">user_exercise_log</text>
+        <rect x="670" y="540" width="400" height="30" rx="7" fill="#0f131a" stroke="#3a4150"/>
+        <text x="684" y="559" fill="#e8eaed">training_day_exercise_v2</text>
+        <rect x="670" y="576" width="400" height="30" rx="7" fill="#0f131a" stroke="#3a4150"/>
+        <text x="684" y="595" fill="#e8eaed">questionnaire / progress</text>
+        <rect x="670" y="612" width="400" height="30" rx="7" fill="#0f131a" stroke="#3a4150"/>
+        <text x="684" y="631" fill="#e8eaed">exercise</text>
+      </g>
+    </svg>
+  </div>
+  <p class="note">Regla de oro: <b>solo el cerebro (score_service.py) habla con la base de datos</b>. La calculadora y las fórmulas nunca la tocan — solo reciben números y devuelven números. Por eso son fáciles de probar.</p>
+
+  <!-- ============ DIAGRAMA 5 — RECORRIDOS POR ACCIÓN ============ -->
+  <h2>5 · Recorridos — qué archivos se encienden en cada acción</h2>
+  <p class="sub">Para cada cosa que hace el usuario, estos son los archivos que participan y en qué orden. La respuesta siempre vuelve por el mismo camino, pasando por la plantilla (schema) antes de llegar a la app.</p>
+
+  <!-- RECORRIDO A -->
+  <div class="route" style="border-left-color:var(--calc)">
+    <div class="rhead"><h3>① Ver mi nivel total</h3><span class="rurl">GET /score</span></div>
+    <p class="rwhat">Abrir la pantalla principal de Puntuaciones. Devuelve el score total, el nivel y el resumen por grupo. En la 1ª vez además rellena el histórico (backfill).</p>
+    <div class="chain">
+      <div class="cnode" style="border-top-color:var(--flutter)"><span class="cf">📱 app</span><span class="cd">abre la pantalla</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--routing)"><span class="cf">score.py</span><span class="cd">recibe GET /score</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--service)"><span class="cf">score_service.py</span><span class="cd">get_user_strength_score()</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--calc)"><span class="cf">score_calculator.py</span><span class="cd">compute_strength_score()</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--math)"><span class="cf">score_math.py</span><span class="cd">total_strength_score() = mediana</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--schema)"><span class="cf">ScoreResponse</span><span class="cd">valida y vuelve a la app</span></div>
+    </div>
+    <div class="rdb"><b>De la BD lee:</b> <code>user_exercise_log</code> <code>training_day_exercise_v2</code> <code>score_exercise_muscle_group</code> <code>strength_standard</code> <code>questionnaire/progress</code> · <b>escribe:</b> <code>score_snapshot</code></div>
+  </div>
+
+  <!-- RECORRIDO B -->
+  <div class="route" style="border-left-color:var(--routing)">
+    <div class="rhead"><h3>② Ver la gráfica de fuerza total</h3><span class="rurl">GET /score/history</span></div>
+    <p class="rwhat">La línea del total en el tiempo (chips Mes / 6 meses / 1 año / Todos). No recalcula: lee las "fotos" ya guardadas.</p>
+    <div class="chain">
+      <div class="cnode" style="border-top-color:var(--flutter)"><span class="cf">📱 app</span><span class="cd">pide la serie</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--routing)"><span class="cf">score.py</span><span class="cd">recibe GET /score/history</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--service)"><span class="cf">score_service.py</span><span class="cd">get_history()</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--schema)"><span class="cf">ScoreHistoryPoint</span><span class="cd">lista de puntos (score 0–300)</span></div>
+    </div>
+    <div class="rdb"><b>De la BD lee:</b> <code>score_snapshot</code> · No pasa por la calculadora ni las fórmulas: los puntos ya estaban guardados.</div>
+  </div>
+
+  <!-- RECORRIDO C -->
+  <div class="route" style="border-left-color:var(--service)">
+    <div class="rhead"><h3>③ Abrir un grupo muscular</h3><span class="rurl">GET /score/groups/{grupo}</span></div>
+    <p class="rwhat">Tocar "Pecho" en la lista: score del grupo, cuánto ha subido en 3 meses, y sus ejercicios.</p>
+    <div class="chain">
+      <div class="cnode" style="border-top-color:var(--flutter)"><span class="cf">📱 app</span><span class="cd">toca un grupo</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--routing)"><span class="cf">score.py</span><span class="cd">recibe /score/groups/pecho</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--service)"><span class="cf">score_service.py</span><span class="cd">group_detail()</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--calc)"><span class="cf">score_calculator.py</span><span class="cd">best_projected_1rm()</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--math)"><span class="cf">score_math.py</span><span class="cd">Epley + nivel + progreso</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--schema)"><span class="cf">GroupDetailResponse</span><span class="cd">grupo + ejercicios + delta 3m</span></div>
+    </div>
+    <div class="rdb"><b>De la BD lee:</b> <code>score_exercise_muscle_group</code> <code>exercise</code> <code>user_exercise_log</code> <code>training_day_exercise_v2</code> <code>strength_standard</code></div>
+  </div>
+
+  <!-- RECORRIDO D -->
+  <div class="route" style="border-left-color:var(--math)">
+    <div class="rhead"><h3>④ Abrir un ejercicio</h3><span class="rurl">GET /score/exercises/{id}</span></div>
+    <p class="rwhat">Tocar "Press banca": mejor marca, la gráfica de progresión en kg y tus PRs (récords).</p>
+    <div class="chain">
+      <div class="cnode" style="border-top-color:var(--flutter)"><span class="cf">📱 app</span><span class="cd">toca un ejercicio</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--routing)"><span class="cf">score.py</span><span class="cd">recibe /score/exercises/5</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--service)"><span class="cf">score_service.py</span><span class="cd">exercise_detail() + _exercise_1rm_history()</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--calc)"><span class="cf">score_calculator.py</span><span class="cd">best_projected_1rm()</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--math)"><span class="cf">score_math.py</span><span class="cd">projected_one_rep_max() (Epley)</span></div>
+      <div class="carrow">→</div>
+      <div class="cnode" style="border-top-color:var(--schema)"><span class="cf">ExerciseDetailResponse</span><span class="cd">mejor lift + gráfica (kg) + PRs</span></div>
+    </div>
+    <div class="rdb"><b>De la BD lee:</b> <code>score_exercise_muscle_group</code> <code>exercise</code> <code>user_exercise_log</code> <code>training_day_exercise_v2</code> · La gráfica usa <code>OneRmPoint</code> (en kg), distinto del histórico del total (en score).</div>
+  </div>
+
+</div>
+</body>
+</html>
