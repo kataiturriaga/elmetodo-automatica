@@ -166,7 +166,7 @@ git commit -m "feat(entreno): provider de la semana actual para progreso semanal
 - (Regenera `lib/l10n/app_localizations*.dart`)
 
 **Interfaces:**
-- Produces (getters en `S`): `viewProgram`, `replaceProgram`, `endProgram`, `addProgram`, `weeklyDaysCompleted(int completed, int total)`, `endProgramTitle`, `endProgramMessage(String programName)`, `endProgramConfirm`, `replaceProgramTitle`, `replaceProgramMessage(String programName)`, `replaceProgramConfirm`.
+- Produces (getters en `S`): `viewProgram`, `replaceProgram`, `endProgram`, `addProgram`, `programWeekProgress(int week, int completed, int total)`, `endProgramTitle`, `endProgramMessage(String programName)`, `endProgramConfirm`, `replaceProgramTitle`, `replaceProgramMessage(String programName)`, `replaceProgramConfirm`.
 
 - [ ] **Step 1: Añadir claves a `app_es.arb`**
 
@@ -177,9 +177,10 @@ Insertar (respetando el formato JSON del archivo; los parametrizados llevan bloq
   "replaceProgram": "Reemplazar programa",
   "endProgram": "Terminar programa",
   "addProgram": "Añadir programa",
-  "weeklyDaysCompleted": "{completed} de {total} completados esta semana",
-  "@weeklyDaysCompleted": {
-    "placeholders": { "completed": { "type": "int" }, "total": { "type": "int" } }
+  "programWeekProgress": "Semana {week} · {completed} de {total} entrenos",
+  "@programWeekProgress": {
+    "description": "Progreso de la SEMANA DEL PROGRAMA (no la semana natural). No se resetea por calendario: avanza al completar los días.",
+    "placeholders": { "week": { "type": "int" }, "completed": { "type": "int" }, "total": { "type": "int" } }
   },
   "endProgramTitle": "¿Terminar programa?",
   "endProgramMessage": "Guardaremos tu progreso de {programName} en el historial. Podrás volver a empezarlo cuando quieras.",
@@ -202,9 +203,10 @@ Insertar (respetando el formato JSON del archivo; los parametrizados llevan bloq
   "replaceProgram": "Replace program",
   "endProgram": "End program",
   "addProgram": "Add program",
-  "weeklyDaysCompleted": "{completed} of {total} completed this week",
-  "@weeklyDaysCompleted": {
-    "placeholders": { "completed": { "type": "int" }, "total": { "type": "int" } }
+  "programWeekProgress": "Week {week} · {completed} of {total} workouts",
+  "@programWeekProgress": {
+    "description": "PROGRAM week progress (not the calendar week). Does not reset on Mondays: it advances as days are completed.",
+    "placeholders": { "week": { "type": "int" }, "completed": { "type": "int" }, "total": { "type": "int" } }
   },
   "endProgramTitle": "End program?",
   "endProgramMessage": "We'll save your {programName} progress to your history. You can start it again anytime.",
@@ -241,8 +243,10 @@ git commit -m "i18n(entreno): claves para selector y gestión de programa"
 - Test: `test/features/training/weekly_progress_bar_preview_test.dart`
 
 **Interfaces:**
-- Consumes: `TrainingWeek` (`completedDays`, `totalDays`, `progressPercent`); `S.weeklyDaysCompleted`.
-- Produces: `class WeeklyProgressBar extends StatelessWidget` con constructor `const WeeklyProgressBar({super.key, required this.week})` donde `final TrainingWeek week;`. Renderiza una barra segmentada (una casilla por día, verde = completado) + label `weeklyDaysCompleted(week.completedDays, week.totalDays)`.
+- Consumes: `TrainingWeek` (`weekNumber`, `completedDays`, `totalDays`); `S.programWeekProgress`.
+- Produces: `class WeeklyProgressBar extends StatelessWidget` con constructor `const WeeklyProgressBar({super.key, required this.week})` donde `final TrainingWeek week;`. Renderiza una barra segmentada (una casilla por día, verde = completado) + label `programWeekProgress(week.weekNumber, week.completedDays, week.totalDays)` → **"Semana 1 · 1 de 6 entrenos"**.
+
+> **⚠️ Semántica de "semana" (decisión de producto, verificada en código):** la semana es la **del programa**, NO la natural del calendario. Verificado: `TrainingWeek` (front) y `MobileWeek` (API) solo tienen `weekNumber` (un contador 1,2,3…) y `days`; no hay fechas ni lógica de calendario (`isocalendar`/`weekday`/`timedelta`) en ninguno de los dos repos. **La barra NO se resetea los lunes**: la semana avanza solo cuando se completan sus días. Por eso el copy NO debe decir "esta semana" (implicaría calendario) sino **"Semana N"**.
 
 - [ ] **Step 1: Write the widget**
 
@@ -254,8 +258,10 @@ import '../../../../core/theme/theme.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/subscription_detail.dart';
 
-/// Barra de progreso de la semana actual: una casilla por día (verde =
-/// completado) + "X de N completados esta semana".
+/// Barra de progreso de la semana **del programa** (no la natural): una
+/// casilla por día (verde = completado) + "Semana N · X de N entrenos".
+///
+/// No se resetea por calendario: la semana avanza cuando se completan sus días.
 class WeeklyProgressBar extends StatelessWidget {
   const WeeklyProgressBar({super.key, required this.week});
 
@@ -289,7 +295,7 @@ class WeeklyProgressBar extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.s8),
         Text(
-          l10n.weeklyDaysCompleted(done, total),
+          l10n.programWeekProgress(week.weekNumber, done, total),
           style: AppTypography.bodySmall.copyWith(color: colors.textSecondary),
         ),
       ],
@@ -1117,7 +1123,7 @@ Usuario de prueba con programas: `ana.garcia.test@mailinator.com` / `Test1234!` 
   - [ ] Debajo, el título del programa "Nombre - N días ▾" a la izquierda; ⋮ a la derecha.
   - [ ] Tocar el título abre el menú con las subscripciones + "＋ Añadir programa"; cambiar de programa actualiza la card.
   - [ ] Tocar ⋮ muestra Ver / Reemplazar / Terminar; "Terminar" pide confirmación y conserva historial.
-  - [ ] Barra de progreso semanal + "X de N completados esta semana" con el conteo correcto de la semana actual.
+  - [ ] Barra de progreso + **"Semana N · X de N entrenos"** con el conteo correcto de la semana **del programa** (no del calendario).
   - [ ] Card héroe con imagen del programa + "PRÓXIMO ENTRENO" + día + botón verde "Entrenar →"; el botón navega a la sesión.
   - [ ] "Tus marcas" intacto debajo.
 
@@ -1144,7 +1150,7 @@ Usuario de prueba con programas: `ana.garcia.test@mailinator.com` / `Test1234!` 
 **Cobertura del spec (decisión de Kata + maqueta):**
 - Título-programa con dropdown ✅ Task 4 + 7. "Añadir programa" ✅ (onAddProgram → catálogo).
 - Menú ⋮ Ver / Reemplazar / Terminar ✅ Task 6 + 7. Confirmación destructiva ✅ Task 5.
-- Progreso semanal "0 de 6 completados esta semana" ✅ Task 1 + 3.
+- Progreso de la semana **del programa** "Semana 1 · 0 de 6 entrenos" ✅ Task 1 + 3 (semántica verificada en front y API: no hay semana natural).
 - Card héroe única = siguiente entreno sobre imagen, botón verde ✅ Task 8.
 - Tab bar conservado, "Tus marcas" conservado ✅ Task 9.
 - Scroll de días ✅ diferido a Fase 2 (documentado).
