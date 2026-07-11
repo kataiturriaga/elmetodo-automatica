@@ -198,8 +198,11 @@ final selectedCurrentWeekProvider = Provider<TrainingWeek?>((ref) {
   return last;
 });
 
-/// Índice, dentro de la semana actual, del primer día sin completar.
-/// Si la semana está entera hecha → 0.
+/// Índice, dentro de la semana actual, del primer día sin completar
+/// (= el "próximo entreno"). Si la semana está entera hecha → 0.
+///
+/// Cambia solo cuando cambian los DATOS (al completar un entreno, al cambiar
+/// de programa). No cambia al deslizar el carrusel.
 final initialDayIndexProvider = Provider<int>((ref) {
   final week = ref.watch(selectedCurrentWeekProvider);
   if (week == null || week.days.isEmpty) return 0;
@@ -207,10 +210,14 @@ final initialDayIndexProvider = Provider<int>((ref) {
   return i < 0 ? 0 : i;
 });
 
-/// Día que el carrusel está mostrando ahora mismo. Lo escribe el PageView.
-final selectedDayIndexProvider = StateProvider<int>((ref) {
-  return ref.watch(initialDayIndexProvider);
-});
+/// Día que el carrusel muestra ahora mismo. Lo escribe SOLO el PageView
+/// (`onPageChanged`) y el propio pager cuando se reposiciona.
+///
+/// ⚠️ Es un StateProvider PURO a propósito: NO debe hacer `ref.watch` de
+/// `initialDayIndexProvider`. Si lo hiciera, se reiniciaría solo al recargarse
+/// los datos y quedaría desincronizado del PageController (que no se entera).
+/// La sincronización se hace explícitamente en [WeekDaysPager] con `ref.listen`.
+final selectedDayIndexProvider = StateProvider<int>((ref) => 0);
 ```
 
 - [ ] **Step 4: Ejecutar y ver que pasa**
@@ -699,14 +706,33 @@ class WeekDaysPager extends ConsumerStatefulWidget {
 class _WeekDaysPagerState extends ConsumerState<WeekDaysPager> {
   PageController? _controller;
 
-  /// Identidad del carrusel actual: (enrollment, semana, nº de días).
-  /// Si cambia, hay que RECREAR el PageController.
+  /// Identidad del carrusel: (enrollment, semana, nº de días). Si cambia
+  /// (p. ej. el usuario elige otro programa), se RECREA el PageController.
   ({int subId, int week, int dayCount})? _key;
 
   @override
   void dispose() {
     _controller?.dispose();
     super.dispose();
+  }
+
+  /// Mueve el carrusel al día [target] y actualiza el provider, de forma que
+  /// la barra de progreso y la card muestren SIEMPRE el mismo día.
+  void _goTo(int target, {required bool animate}) {
+    final c = _controller;
+    if (c == null) return;
+    if (animate && c.hasClients) {
+      c.animateToPage(target,
+          duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+    } else if (c.hasClients) {
+      c.jumpToPage(target);
+    }
+    // Fuera del frame de build: el provider lo escribe el propio pager.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(selectedDayIndexProvider.notifier).state = target;
+      }
+    });
   }
 
   @override
@@ -718,23 +744,30 @@ class _WeekDaysPagerState extends ConsumerState<WeekDaysPager> {
     }
 
     final initial = ref.watch(initialDayIndexProvider);
+    final lastIndex = week.days.length - 1;
 
-    // ⚠️ NO usar `_controller ??= ...`. El contenido se recarga cada vez que el
-    // usuario sale de un entreno (training_day_screen.dart:62 invalida
-    // trainingContentNotifierProvider), y el programa puede cambiar desde el
-    // dropdown. Si el controller no se recrea:
-    //   · el carrusel se queda en el día viejo mientras la barra marca otro
-    //     (quedan desincronizados), y
-    //   · si el programa nuevo tiene menos días, el índice se sale de rango.
+    // (1) Cambió el programa o la semana → recrear el controller desde cero.
+    //     `??=` NO vale: el índice podría quedar fuera de rango si el programa
+    //     nuevo tiene menos días.
     final key = (subId: sub.id, week: week.weekNumber, dayCount: week.days.length);
     if (_key != key) {
       _key = key;
       _controller?.dispose();
       _controller = PageController(
-        initialPage: initial.clamp(0, week.days.length - 1),
+        initialPage: initial.clamp(0, lastIndex),
         viewportFraction: 1.0,
       );
+      _goTo(initial.clamp(0, lastIndex), animate: false);
     }
+
+    // (2) Cambió el "próximo entreno" SIN cambiar de semana → es el caso de
+    //     completar un entreno y volver (training_day_screen.dart:62 invalida
+    //     el contenido). El carrusel debe AVANZAR solo al nuevo próximo, o
+    //     se queda mostrando un día distinto del que marca la barra.
+    ref.listen<int>(initialDayIndexProvider, (prev, next) {
+      if (prev == next) return;
+      _goTo(next.clamp(0, lastIndex), animate: true);
+    });
 
     final selected = ref.watch(selectedDayIndexProvider);
     // El "próximo" es el primer día sin completar de la semana.
@@ -808,13 +841,23 @@ class _WeekDaysPagerState extends ConsumerState<WeekDaysPager> {
 ```dart
 // test/features/training/week_days_pager_test.dart
 // ProviderScope(overrides: [selectedSubscriptionProvider, selectedCurrentWeekProvider...])
-// Verificar:
-//  - Se renderiza la card del primer día SIN completar (arranca ahí).
-//  - Hay tantos dots como días tiene la semana.
-//  - REGRESIÓN (bug del controller): cambiar la subscripción por otra con
-//    MENOS días (p. ej. de 4 a 3) y re-pump. NO debe lanzar excepción ni
-//    quedarse en un índice fuera de rango: el carrusel debe recrearse en el
-//    primer día sin completar del programa nuevo.
+//
+// 1. Arranque: se ve la card del primer día SIN completar; hay tantos dots
+//    como días tiene la semana.
+//
+// 2. REGRESIÓN "completar un entreno" (el caso MÁS común):
+//    Semana de 4 días con el día 3 (índice 2) como próximo.
+//    Cambiar el override para que el día 3 pase a isCompleted: true
+//    (simula volver de completarlo) y `await tester.pumpAndSettle()`.
+//    → El carrusel debe haber AVANZADO al día 4 (índice 3), y
+//      `selectedDayIndexProvider` debe valer 3.
+//    → Barra y card deben coincidir. Antes del fix, el carrusel se quedaba
+//      en el índice 2 mientras la barra marcaba el 3.
+//
+// 3. REGRESIÓN "cambiar de programa":
+//    Sustituir la subscripción por otra con MENOS días (4 → 3) y re-pump.
+//    → No debe lanzar excepción ni quedar fuera de rango; el carrusel se
+//      recrea en el primer día sin completar del programa nuevo.
 ```
 
 - [ ] **Step 3: Ejecutar**
@@ -908,6 +951,9 @@ class ProgramSelectorButton extends StatelessWidget {
     return PopupMenuButton<int>(
       offset: const Offset(0, 44),
       color: colors.bgSurface2,
+      // Un usuario puede acumular muchos programas activos (el usuario de test
+      // tiene 10). Sin tope, el menú se saldría de la pantalla.
+      constraints: const BoxConstraints(maxHeight: 360),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.s8),
         side: BorderSide(color: colors.strokeDivider),
@@ -1262,6 +1308,10 @@ git commit -m "feat(entreno): header con selector y gestion de programa"
               const SizedBox(height: AppSpacing.s16),
 
               if (isSelectedCompleted) ...[
+                // Programa terminado: la barra (arriba) se ve TODA VERDE y
+                // debajo la card de completado, que YA trae los botones
+                // "Archivar programa" y "Reiniciar programa" (no hay que
+                // construirlos: program_completed_card.dart:208-221).
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
@@ -1329,7 +1379,9 @@ Usuario con programas: `ana.garcia.test@mailinator.com` / `Test1234!` (10 subscr
   - [ ] Tocar el título → lista con **"Masa magra · Gimnasio · 4 días"** (✓ en el activo) + "＋ Añadir programa".
   - [ ] **Desambiguación:** Ana tiene el mismo programa en varias ubicaciones. Comprobar que los ítems **se distinguen** (no salen dos "Masa magra" idénticos).
   - [ ] **Regresión del carrusel:** cambiar de programa desde el dropdown → el carrusel y la barra deben **reposicionarse juntos** en el día correcto del programa nuevo (no quedarse en el día viejo ni petar).
-  - [ ] **Regresión al volver de un entreno:** completar un día y volver → la card debe pasar a COMPLETADO y el carrusel avanzar al siguiente, **con la barra sincronizada** (mismo día marcado en gris claro que el que muestra la card).
+  - [ ] **Regresión al volver de un entreno (el caso más común):** completar un día y volver → el carrusel **se desliza solo** al siguiente entreno, **con la barra sincronizada** (el día que marca la barra en gris claro es el mismo que muestra la card). Antes del fix quedaban desincronizados.
+  - [ ] **Menú largo:** con el usuario de test (10 programas) el desplegable **hace scroll** y no se sale de la pantalla.
+  - [ ] **Programa terminado:** barra toda verde + card de completado con sus botones **"Archivar programa"** / **"Reiniciar programa"** (ya existen, no se construyen).
   - [ ] Tocar ⋮ → **Ver programa** (lleva a la estructura del programa con semanas) y **Terminar programa** (pide confirmación; conserva el progreso).
   - [ ] Barra: casillas verdes (hechas), gris claro (la que ves), gris oscuro (pendientes). Texto **"Semana N · X de N entrenos"**.
   - [ ] Card **sin botón**, con la foto del programa. Tag correcto: PRÓXIMO ENTRENO / COMPLETADO / **EN CURSO (naranja)** / sin tag.
