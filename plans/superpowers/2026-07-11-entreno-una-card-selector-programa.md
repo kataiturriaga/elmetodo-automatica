@@ -699,6 +699,10 @@ class WeekDaysPager extends ConsumerStatefulWidget {
 class _WeekDaysPagerState extends ConsumerState<WeekDaysPager> {
   PageController? _controller;
 
+  /// Identidad del carrusel actual: (enrollment, semana, nº de días).
+  /// Si cambia, hay que RECREAR el PageController.
+  ({int subId, int week, int dayCount})? _key;
+
   @override
   void dispose() {
     _controller?.dispose();
@@ -714,7 +718,23 @@ class _WeekDaysPagerState extends ConsumerState<WeekDaysPager> {
     }
 
     final initial = ref.watch(initialDayIndexProvider);
-    _controller ??= PageController(initialPage: initial, viewportFraction: 1.0);
+
+    // ⚠️ NO usar `_controller ??= ...`. El contenido se recarga cada vez que el
+    // usuario sale de un entreno (training_day_screen.dart:62 invalida
+    // trainingContentNotifierProvider), y el programa puede cambiar desde el
+    // dropdown. Si el controller no se recrea:
+    //   · el carrusel se queda en el día viejo mientras la barra marca otro
+    //     (quedan desincronizados), y
+    //   · si el programa nuevo tiene menos días, el índice se sale de rango.
+    final key = (subId: sub.id, week: week.weekNumber, dayCount: week.days.length);
+    if (_key != key) {
+      _key = key;
+      _controller?.dispose();
+      _controller = PageController(
+        initialPage: initial.clamp(0, week.days.length - 1),
+        viewportFraction: 1.0,
+      );
+    }
 
     final selected = ref.watch(selectedDayIndexProvider);
     // El "próximo" es el primer día sin completar de la semana.
@@ -789,9 +809,12 @@ class _WeekDaysPagerState extends ConsumerState<WeekDaysPager> {
 // test/features/training/week_days_pager_test.dart
 // ProviderScope(overrides: [selectedSubscriptionProvider, selectedCurrentWeekProvider...])
 // Verificar:
-//  - Se renderizan tantas NextWorkoutCard como días tiene la semana (find.byType, en el PageView solo la visible).
-//  - Arranca en el primer día sin completar (el visible es ese).
-//  - Hay tantos dots como días.
+//  - Se renderiza la card del primer día SIN completar (arranca ahí).
+//  - Hay tantos dots como días tiene la semana.
+//  - REGRESIÓN (bug del controller): cambiar la subscripción por otra con
+//    MENOS días (p. ej. de 4 a 3) y re-pump. NO debe lanzar excepción ni
+//    quedarse en un índice fuera de rango: el carrusel debe recrearse en el
+//    primer día sin completar del programa nuevo.
 ```
 
 - [ ] **Step 3: Ejecutar**
@@ -815,10 +838,19 @@ git commit -m "feat(entreno): carrusel de dias de la semana con dots"
 - Test: `test/features/training/program_selector_button_preview_test.dart`
 
 **Interfaces:**
-- Consumes: `List<SubscriptionDetail>`, `int selectedIndex`, `ValueChanged<int> onSelect`, `VoidCallback onAddProgram`; `SubscriptionDetail.programName` y `.daysPerWeek`; `S.addProgram`, `S.days`. Patrón visual: `MarcaSelector` (`widgets/marcas/marca_dropdown.dart`) — es el dropdown canónico de la app.
+- Consumes: `List<SubscriptionDetail>`, `int selectedIndex`, `ValueChanged<int> onSelect`, `VoidCallback onAddProgram`; `SubscriptionDetail.programName`, `.location`, `.daysPerWeek`; `S.addProgram`, `S.days`, **`S.locationGym` / `S.locationHomeBands` / `S.locationHomeDumbbells`** (ya existen en los .arb). Patrón visual: `MarcaSelector` (`widgets/marcas/marca_dropdown.dart`) — el dropdown canónico de la app.
 - Produces: `class ProgramSelectorButton extends StatelessWidget` con
-  `const ProgramSelectorButton({super.key, required this.subscriptions, required this.selectedIndex, required this.onSelect, required this.onAddProgram})`.
-- Título: `"${programName} - ${daysPerWeek} ${l10n.days}"` → **"Masa magra - 4 días"** (los programas reales son de 3/4/5 días; `daysPerWeek` los cuenta de verdad).
+  `const ProgramSelectorButton({super.key, required this.subscriptions, required this.selectedIndex, required this.onSelect, required this.onAddProgram})`, y el helper público `String locationLabel(TrainingLocation, S)`.
+
+**🚨 La ubicación es OBLIGATORIA para desambiguar.** Un usuario puede estar inscrito al **mismo programa en dos sitios** (p. ej. *Masa magra* en gimnasio para entre semana y en casa el finde) — caso real y frecuente. Sin la ubicación, el dropdown mostraría dos ítems **idénticos** y el título no diría cuál estás viendo.
+
+| Dónde | Formato | Ejemplo |
+|---|---|---|
+| **Título del header** | `nombre · ubicación` | **"Masa magra · Gimnasio"** |
+| **Ítems del dropdown** | `nombre · ubicación · días` | **"Masa magra · Gimnasio · 4 días"** |
+
+> Los días **solo** van en el dropdown (en el título quedaban raros). `daysPerWeek` cuenta los días reales (3/4/5 según el programa).
+> **Usar las claves l10n oficiales**, no los literales hardcodeados de `active_programs_section.dart` (que además dicen "Casa - Gomas" en vez de "Casa con gomas").
 
 - [ ] **Step 1: Implementar**
 
@@ -829,11 +861,25 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/subscription_detail.dart';
+import '../../domain/entities/training_location.dart';
 
 const int _kAddProgram = -1;
 
-/// Nombre del programa como botón-dropdown: "Masa magra - 4 días ▾".
-/// Abre un menú para cambiar de programa activo o añadir uno nuevo.
+/// Etiqueta de la ubicación, desde l10n (NO hardcodear: `active_programs_section`
+/// tiene literales antiguos que no coinciden con los .arb).
+String locationLabel(TrainingLocation location, S l10n) => switch (location) {
+      TrainingLocation.gym => l10n.locationGym,
+      TrainingLocation.home => l10n.locationHomeBands,
+      TrainingLocation.homeWithMaterial => l10n.locationHomeDumbbells,
+    };
+
+/// Programa activo como botón-dropdown.
+///
+/// Título: "Masa magra · Gimnasio ▾"
+/// Ítems:  "Masa magra · Gimnasio · 4 días"
+///
+/// La ubicación es imprescindible: el mismo programa puede estar activo en
+/// gimnasio Y en casa a la vez, y sin ella los ítems serían indistinguibles.
 class ProgramSelectorButton extends StatelessWidget {
   const ProgramSelectorButton({
     super.key,
@@ -854,7 +900,10 @@ class ProgramSelectorButton extends StatelessWidget {
     final colors = context.colors;
     final i = selectedIndex.clamp(0, subscriptions.length - 1);
     final current = subscriptions[i];
-    final title = '${current.programName} - ${current.daysPerWeek} ${l10n.days}';
+
+    // Título: nombre + ubicación (sin días — quedaban raros).
+    final title =
+        '${current.programName.trim()} · ${locationLabel(current.location, l10n)}';
 
     return PopupMenuButton<int>(
       offset: const Offset(0, 44),
@@ -870,7 +919,10 @@ class ProgramSelectorButton extends StatelessWidget {
             value: j,
             child: Row(children: [
               Expanded(child: Text(
-                subscriptions[j].programName,
+                // En el dropdown SÍ van los días: aquí es donde se elige.
+                '${subscriptions[j].programName.trim()} · '
+                '${locationLabel(subscriptions[j].location, l10n)} · '
+                '${subscriptions[j].daysPerWeek} ${l10n.days}',
                 style: AppTypography.bodyMedium.copyWith(
                   color: j == i ? colors.brandPrimary : colors.textPrimary,
                   fontWeight: j == i ? FontWeight.w700 : FontWeight.w400,
@@ -1273,8 +1325,11 @@ Usuario con programas: `ana.garcia.test@mailinator.com` / `Test1234!` (10 subscr
 
 - [ ] **Step 2: Checklist visual**
   - [ ] El tab "Entreno / Seguimiento" sigue arriba, intacto.
-  - [ ] Título **"Masa magra - 4 días ▾"** a la izquierda; **⋮** a la derecha.
-  - [ ] Tocar el título → lista de programas (✓ en el activo) + "＋ Añadir programa". Cambiar de programa actualiza la barra y el carrusel.
+  - [ ] Título **"Masa magra · Gimnasio ▾"** a la izquierda; **⋮** a la derecha.
+  - [ ] Tocar el título → lista con **"Masa magra · Gimnasio · 4 días"** (✓ en el activo) + "＋ Añadir programa".
+  - [ ] **Desambiguación:** Ana tiene el mismo programa en varias ubicaciones. Comprobar que los ítems **se distinguen** (no salen dos "Masa magra" idénticos).
+  - [ ] **Regresión del carrusel:** cambiar de programa desde el dropdown → el carrusel y la barra deben **reposicionarse juntos** en el día correcto del programa nuevo (no quedarse en el día viejo ni petar).
+  - [ ] **Regresión al volver de un entreno:** completar un día y volver → la card debe pasar a COMPLETADO y el carrusel avanzar al siguiente, **con la barra sincronizada** (mismo día marcado en gris claro que el que muestra la card).
   - [ ] Tocar ⋮ → **Ver programa** (lleva a la estructura del programa con semanas) y **Terminar programa** (pide confirmación; conserva el progreso).
   - [ ] Barra: casillas verdes (hechas), gris claro (la que ves), gris oscuro (pendientes). Texto **"Semana N · X de N entrenos"**.
   - [ ] Card **sin botón**, con la foto del programa. Tag correcto: PRÓXIMO ENTRENO / COMPLETADO / **EN CURSO (naranja)** / sin tag.
@@ -1302,7 +1357,14 @@ Usuario con programas: `ana.garcia.test@mailinator.com` / `Test1234!` (10 subscr
 
 **Consistencia de tipos:** `selectedCurrentWeekProvider` (`TrainingWeek?`), `selectedDayIndexProvider` (`int`) e `initialDayIndexProvider` (`int`) se usan igual en T3/T5/T10. `WorkoutCardState` + `workoutCardStateFor(day, isNext:)` definidos en T4 y consumidos en T5. `showEndProgramDialog(context:, programName:) → Future<bool>` definido en T7 y usado en T9.
 
-**Verificado contra datos reales (API dev):** "Masa magra" tiene **4 días/semana**; los días se llaman "Tren superior", "Pierna + Core", "Fullbody"; tienen 7/5/5/4 ejercicios. El campo `training_type` contiene listas largas de músculos → **no se muestra**. La duración **no existe** → no se muestra.
+**Verificado contra datos reales (API dev):**
+- "Masa magra" tiene **4 días/semana**; los días son "Tren superior", "Pierna + Core", "Fullbody"…; con 7/5/5/4 ejercicios.
+- `training_type` contiene listas largas de músculos ("Pecho, espalda, hombros…") → **no se muestra**.
+- La duración del entreno **no existe** → no se muestra.
+- **El mismo programa puede estar activo en varias ubicaciones a la vez** (gym + casa) → sin la ubicación, el dropdown mostraría ítems idénticos. **Por eso la ubicación es obligatoria.**
+- Los ejercicios por día van de **1 a 13**; no hay días con 0 (el singular "1 ejercicio" está contemplado).
+- Nombres cortos: programa máx. 16 caracteres, día máx. 29 → sin riesgo de desbordamiento (aun así, `maxLines: 2` + ellipsis en la card).
+- Hoy todos los programas tienen **1 fase** y **todas las semanas con los mismos días**. `daysPerWeek` se calcula de la primera semana: si en el futuro hubiera semanas desiguales, el número mostrado no valdría para todas. *(Riesgo anotado, no se materializa hoy.)*
 
 **A verificar al implementar:** parámetros `required` reales de las entidades de dominio (fixtures de test); firma exacta de `AppButton`; `withValues(alpha:)` vs `withOpacity` según la versión de Flutter.
 
