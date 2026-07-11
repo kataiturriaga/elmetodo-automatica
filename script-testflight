@@ -1,0 +1,8 @@
+Primero, subir un número a un
+
+pubspec.yaml
+
+
+cd ~/repos/elmetodo_app
+export PATH="/opt/homebrew/opt/ruby@3.3/bin:$PATH"
+bundle exec fastlane ios beta env:development
