@@ -2,61 +2,93 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Rediseñar la pestaña "Entreno" de la app: sustituir el carrusel de programas + card "Siguiente entreno" separada por (a) un header con el nombre del programa como título-dropdown + menú ⋮ de gestión, (b) una barra de progreso semanal, y (c) una card héroe única = el siguiente entreno sobre la imagen del programa, con botón verde sólido.
+**Goal:** Rediseñar la pestaña "Entreno": sustituir el carrusel de programas + la card "Siguiente entreno" por (a) un header con el nombre del programa como título-dropdown + menú ⋮, (b) una barra de progreso de la semana con 3 estados, y (c) **una card héroe única, sin botón**, que muestra el entreno del día sobre la imagen del programa y se desliza entre los días de la semana actual.
 
-**Architecture:** Todo el trabajo es **frontend Flutter** (repo `elmetodo_app`). El backend ya expone lo necesario vía `GET /api/training/content` (estructura completa `phases → weeks → days` con completion por día). El "programa activo" se selecciona **client-side** (no hay ni hace falta endpoint de "programa actual"); el progreso semanal se **deriva client-side** contando `is_completed` en la semana actual. Se reutilizan patrones existentes: `PopupMenuButton` (de `MarcaSelector`) para dropdown y kebab, `DeleteActivityDialog` para confirmaciones destructivas, y la base visual de `_ActiveProgramCard` (imagen + gradiente) para la card héroe.
+**Architecture:** 100 % **frontend Flutter** (`elmetodo_app`). **Cero cambios de backend.** Todo sale de `GET /api/training/content`, que ya devuelve la estructura completa `phases → weeks → days` con el completado de cada día. El programa activo se elige **en local**; el progreso semanal se **calcula en local**.
 
-**Tech Stack:** Flutter, Riverpod (riverpod_generator / `@riverpod`), go_router, golden/widget tests con `flutter_test`.
+**Tech Stack:** Flutter, Riverpod (`@riverpod`), go_router, golden/widget tests.
 
 ## Global Constraints
 
-- **Repo de código:** `/Users/kataiturriaga/repos/elmetodo_app`. Rama de trabajo: `ux/entreno-card-siguiente-v-b` (ya creada, ya contiene la card `next_training_card.dart` con botón verde + su golden test).
-- **Sin cambios de backend.** Todo se resuelve con datos de `GET /api/training/content` (ya consumido por `trainingContentNotifierProvider`).
-- **Tokens de diseño:** usar siempre `context.colors.<token>` (nunca hex). Verde de marca = `context.colors.brandPrimary`. Espaciados = `AppSpacing.sN`. Tipografía = `AppTypography.*`. Import barrel: `import '../../../../core/theme/theme.dart';`.
-- **Localización:** todo texto visible vía `S.of(context)` con claves en `lib/l10n/app_es.arb` **y** `app_en.arb`; regenerar con `flutter gen-l10n` (o `flutter pub get` según config) tras editar los `.arb`. Idioma primario ES.
-- **"Terminar programa" NO usa `unsubscribeFromProgram` (DELETE duro que borra progreso).** Usa `archiveProgram(id, keepProgress: true)` que conserva historial.
-- **Acciones destructivas (Terminar, Reemplazar) requieren diálogo de confirmación.**
-- **Providers nuevos:** si se añade un `@riverpod`, regenerar con `dart run build_runner build --delete-conflicting-outputs`.
-- **Tests:** cada widget nuevo lleva golden test siguiendo el patrón de `test/features/training/next_training_card_preview_test.dart` (carga fuentes OpenSans + MaterialIcons en `setUpAll`). Regenerar goldens con `--update-goldens`.
-- **Fuera de alcance de este plan (Fase 2, documentado al final):** scroll horizontal entre días de la semana dentro de la card héroe.
+- **Repo:** `/Users/kataiturriaga/repos/elmetodo_app`. Rama: `ux/entreno-card-siguiente-v-b`.
+- **CERO backend.** Si algo parece necesitar un endpoint nuevo, PARAR y consultar.
+- **Tokens de diseño:** siempre `context.colors.<token>`, nunca hex. Espaciados `AppSpacing.sN`. Tipografía `AppTypography.*`. Barrel: `import '../../../../core/theme/theme.dart';`.
+- **Localización:** todo texto vía `S.of(context)`, claves en `app_es.arb` **y** `app_en.arb`; regenerar con `flutter gen-l10n`.
+- **"Terminar programa"** usa `archiveProgram(id)` (archiva, **conserva el progreso**). **NUNCA `unsubscribeFromProgram`** — es un borrado duro que destruye el progreso.
+- **Tests:** cada widget lleva golden test siguiendo `test/features/training/next_training_card_preview_test.dart` (carga fuentes OpenSans + MaterialIcons en `setUpAll`, o los textos salen como cajas). Regenerar con `--update-goldens`.
+
+## Decisiones de producto ya cerradas (no re-abrir)
+
+| Tema | Decisión |
+|---|---|
+| **Botón "Entrenar"** | **NO existe.** La card entera es tocable. El tag comunica el estado. |
+| **Semana** | Es la **semana del programa**, no la natural. No se resetea los lunes: avanza al completar sus días. Copy: "Semana N · X de N entrenos" (nunca "esta semana"). |
+| **Deslizar** | Solo entre los días de la **semana actual**. Para ver el resto del programa → "Ver programa" (⋮). |
+| **Reemplazar programa** | **Fuera de alcance.** Se consigue con Terminar + Añadir. |
+| **Saltar un entreno** | **Fuera de alcance.** Requeriría backend. Quien quiera avanzar, marca el entreno como completado. |
+| **Duración del entreno** | **No se muestra.** El dato NO existe en el backend. No inventarlo. |
+| **Título de la card** | El campo `name` del día ("Tren superior"). **NO usar `training_type`**: contiene una lista larga de músculos ("Pecho, espalda, hombros…") que no cabe. |
+| **Días opcionales** | Kata los está limpiando del contenido (tarea aparte). No hacer nada en la app. |
 
 ---
 
 ## Mapa de archivos
 
+**Ya hecho (fuera de las tareas):**
+- ✅ `lib/core/theme/app_colors.dart` — añadido `AppColors.orange500` (#E88710) y el token semántico `context.colors.warning` (naranja en **ambos** temas; en Figma el modo claro está mal puesto en blanco). Test: `test/core/warning_token_test.dart`.
+
 **Nuevos:**
-- `lib/features/training/presentation/providers/current_week_provider.dart` — provider `selectedCurrentWeekProvider` (`TrainingWeek?`).
-- `lib/features/training/presentation/widgets/program_selector_button.dart` — el título-programa con dropdown.
-- `lib/features/training/presentation/widgets/program_actions_menu.dart` — el kebab ⋮ (Ver / Reemplazar / Terminar).
-- `lib/features/training/presentation/widgets/program_header_row.dart` — compone selector + kebab en una fila.
-- `lib/features/training/presentation/widgets/weekly_progress_bar.dart` — barra + "X de N completados esta semana".
-- `lib/features/training/presentation/widgets/next_training_hero_card.dart` — card héroe (imagen programa + siguiente entreno + botón verde).
+- `lib/features/training/presentation/providers/current_week_provider.dart` — `selectedCurrentWeekProvider` (`TrainingWeek?`) + `selectedDayIndexProvider` (`StateProvider<int>`).
+- `lib/features/training/presentation/widgets/program_selector_button.dart` — título-programa con dropdown.
+- `lib/features/training/presentation/widgets/program_actions_menu.dart` — kebab ⋮ (Ver programa / Terminar programa).
+- `lib/features/training/presentation/widgets/program_header_row.dart` — compone selector + kebab.
+- `lib/features/training/presentation/widgets/weekly_progress_bar.dart` — barra con 3 estados.
+- `lib/features/training/presentation/widgets/next_workout_card.dart` — la card héroe (4 tags, **sin botón**).
+- `lib/features/training/presentation/widgets/week_days_pager.dart` — el carrusel de días + dots.
 - `lib/core/widgets/common/end_program_dialog.dart` — `showEndProgramDialog`.
-- Tests golden/widget para cada widget en `test/features/training/`.
 
 **Modificados:**
-- `lib/features/training/presentation/screens/main_entreno_screen.dart` — `_ProgramsTab` (L206–275): insertar header + weekly progress + hero card; retirar `ActiveProgramsSection` y `_NextTrainingSection`.
-- `lib/l10n/app_es.arb` y `lib/l10n/app_en.arb` — claves nuevas.
+- `lib/features/training/presentation/screens/main_entreno_screen.dart` — `_ProgramsTab` (L206–275).
+- `lib/l10n/app_es.arb`, `lib/l10n/app_en.arb`.
 
-**Se conservan sin tocar:** `_PreviousRecordsSection` / `MarcasSection` ("Tus marcas"), `SegmentedTabBar` (tab Entreno/Seguimiento), `_EmptyProgramsTab`, `ProgramCompletedCard`, `_LoadingState`, `_ErrorState`.
+**Se conservan:** `SegmentedTabBar` (tab Entreno/Seguimiento), `MarcasSection` ("Tus marcas"), `_EmptyProgramsTab`, `ProgramCompletedCard`, `_LoadingState`, `_ErrorState`.
 
-**Posible retirada tras integración:** `active_programs_section.dart` y `next_training_card.dart` quedan sin uso en `_ProgramsTab`. NO borrar en este plan (pueden usarse en otros sitios / como fallback). Marcar como candidatos a limpieza en un PR posterior.
+**Quedan sin uso** (NO borrar en este plan): `active_programs_section.dart`, `next_training_card.dart`.
 
 ---
 
-## FASE 1 — Núcleo (pantalla nueva funcional, card fija en el siguiente entreno)
+## Anatomía de la pantalla final
 
-### Task 1: Provider de la semana actual
+```
+[ Entreno | Seguimiento ]          ← tab bar (existente, NO tocar)
+Masa magra - 4 días  ▾       ⋮     ← Task 7
+▓▓░░   Semana 1 · 2 de 4 entrenos  ← Task 3
+┌───────────────────────────┐
+│ [TAG]                     │      ← Task 8 + 9 (carrusel de días)
+│                           │        card ENTERA tocable, SIN botón
+│  Tren superior            │
+│  7 ejercicios             │
+└───────────────────────────┘
+        • • ● •                     ← dots del carrusel
+Tus marcas (chips + gráfica)       ← existente, NO tocar
+```
+
+---
+
+### Task 1: Providers de la semana actual y del día seleccionado
 
 **Files:**
 - Create: `lib/features/training/presentation/providers/current_week_provider.dart`
 - Test: `test/features/training/current_week_provider_test.dart`
 
 **Interfaces:**
-- Consumes: `selectedSubscriptionProvider` → `SubscriptionDetail?` (de `training_providers.dart:294`); entidades `SubscriptionDetail`, `ProgramPhase`, `TrainingWeek`, `TrainingDay` (de `domain/entities/subscription_detail.dart`).
-- Produces: `selectedCurrentWeekProvider` → `TrainingWeek?` — la primera semana (recorriendo `phases → weeks`) que contiene algún día `!isCompleted`; si todas completas, la última semana; si no hay datos, `null`.
+- Consumes: `selectedSubscriptionProvider` → `SubscriptionDetail?` (`training_providers.dart:294`); entidades `SubscriptionDetail`, `ProgramPhase`, `TrainingWeek`, `TrainingDay`.
+- Produces:
+  - `selectedCurrentWeekProvider` → `TrainingWeek?` — la primera semana (recorriendo `phases → weeks`) con algún día `!isCompleted`. Si todo está completo → la última. Si no hay datos → `null`.
+  - `selectedDayIndexProvider` → `StateProvider<int>` — índice del día que el carrusel está mostrando, dentro de `currentWeek.days`. Arranca en el primer día no completado (o 0).
+  - `initialDayIndexProvider` → `Provider<int>` — el índice inicial calculado (primer día sin completar de la semana, o 0 si todos hechos).
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Escribir el test que falla**
 
 ```dart
 // test/features/training/current_week_provider_test.dart
@@ -67,56 +99,78 @@ import 'package:elmetodo_app/features/training/domain/entities/training_location
 import 'package:elmetodo_app/features/training/presentation/providers/training_providers.dart';
 import 'package:elmetodo_app/features/training/presentation/providers/current_week_provider.dart';
 
-TrainingDay _day(int id, {required bool done}) => TrainingDay(
-      id: id, dayOrder: id, name: 'Día $id', isCompleted: done,
-    );
+TrainingDay _day(int id, {required bool done}) =>
+    TrainingDay(id: id, dayOrder: id, name: 'Día $id', isCompleted: done);
 
 SubscriptionDetail _sub(List<TrainingWeek> weeks) => SubscriptionDetail(
-      id: 1, programId: 1, programName: 'Test', location: TrainingLocation.gym,
-      zones: const [], completedDays: 0, totalDays: 6,
+      id: 1, programId: 1, programName: 'Masa magra',
+      location: TrainingLocation.gym, zones: const [],
+      completedDays: 0, totalDays: 4,
       enrolledAt: DateTime(2026, 1, 1), isActive: true, isCompleted: false,
-      phases: [ProgramPhase(id: 1, phaseOrder: 1, name: 'F1', totalWeeks: weeks.length, completedWeeks: 0, weeks: weeks)],
+      phases: [ProgramPhase(
+        id: 1, phaseOrder: 1, name: 'F1',
+        totalWeeks: weeks.length, completedWeeks: 0, weeks: weeks)],
     );
 
 void main() {
-  test('devuelve la semana que contiene el primer día no completado', () {
+  test('la semana actual es la que tiene el primer día sin completar', () {
     final w1 = TrainingWeek(weekNumber: 1, days: [_day(1, done: true), _day(2, done: true)]);
     final w2 = TrainingWeek(weekNumber: 2, days: [_day(3, done: false), _day(4, done: false)]);
-    final container = ProviderContainer(overrides: [
+    final c = ProviderContainer(overrides: [
       selectedSubscriptionProvider.overrideWith((ref) => _sub([w1, w2])),
     ]);
-    addTearDown(container.dispose);
-    expect(container.read(selectedCurrentWeekProvider)?.weekNumber, 2);
+    addTearDown(c.dispose);
+    expect(c.read(selectedCurrentWeekProvider)?.weekNumber, 2);
   });
 
   test('si todo está completo, devuelve la última semana', () {
     final w1 = TrainingWeek(weekNumber: 1, days: [_day(1, done: true)]);
     final w2 = TrainingWeek(weekNumber: 2, days: [_day(2, done: true)]);
-    final container = ProviderContainer(overrides: [
+    final c = ProviderContainer(overrides: [
       selectedSubscriptionProvider.overrideWith((ref) => _sub([w1, w2])),
     ]);
-    addTearDown(container.dispose);
-    expect(container.read(selectedCurrentWeekProvider)?.weekNumber, 2);
+    addTearDown(c.dispose);
+    expect(c.read(selectedCurrentWeekProvider)?.weekNumber, 2);
   });
 
   test('sin subscripción devuelve null', () {
-    final container = ProviderContainer(overrides: [
+    final c = ProviderContainer(overrides: [
       selectedSubscriptionProvider.overrideWith((ref) => null),
     ]);
-    addTearDown(container.dispose);
-    expect(container.read(selectedCurrentWeekProvider), isNull);
+    addTearDown(c.dispose);
+    expect(c.read(selectedCurrentWeekProvider), isNull);
+  });
+
+  test('el día inicial es el primero sin completar de la semana', () {
+    final w = TrainingWeek(weekNumber: 1, days: [
+      _day(1, done: true), _day(2, done: true), _day(3, done: false), _day(4, done: false),
+    ]);
+    final c = ProviderContainer(overrides: [
+      selectedSubscriptionProvider.overrideWith((ref) => _sub([w])),
+    ]);
+    addTearDown(c.dispose);
+    expect(c.read(initialDayIndexProvider), 2); // índice 2 = tercer día
+  });
+
+  test('si la semana está entera hecha, el día inicial es 0', () {
+    final w = TrainingWeek(weekNumber: 1, days: [_day(1, done: true), _day(2, done: true)]);
+    final c = ProviderContainer(overrides: [
+      selectedSubscriptionProvider.overrideWith((ref) => _sub([w])),
+    ]);
+    addTearDown(c.dispose);
+    expect(c.read(initialDayIndexProvider), 0);
   });
 }
 ```
 
-> Nota: verificar los constructores exactos de `SubscriptionDetail`/`ProgramPhase`/`TrainingWeek`/`TrainingDay` en `domain/entities/subscription_detail.dart` y ajustar los parámetros nombrados requeridos (los mostrados son los que el entity marca `required`). Si `selectedSubscriptionProvider` es un provider de función generado, usar `overrideWith` con la firma correcta (puede requerir `overrideWithValue` si no es generado — comprobar `training_providers.dart:294`).
+> Verificar los parámetros `required` reales de `SubscriptionDetail` / `ProgramPhase` / `TrainingWeek` / `TrainingDay` en `domain/entities/subscription_detail.dart` y ajustar el fixture. Si `selectedSubscriptionProvider` es generado, comprobar la firma correcta de `overrideWith`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Ejecutar el test y ver que falla**
 
 Run: `cd /Users/kataiturriaga/repos/elmetodo_app && flutter test test/features/training/current_week_provider_test.dart`
-Expected: FAIL — `selectedCurrentWeekProvider` no existe.
+Expected: FAIL — `current_week_provider.dart` no existe.
 
-- [ ] **Step 3: Write minimal implementation**
+- [ ] **Step 3: Implementar**
 
 ```dart
 // lib/features/training/presentation/providers/current_week_provider.dart
@@ -125,9 +179,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/subscription_detail.dart';
 import 'training_providers.dart';
 
-/// La "semana actual" de la subscripción seleccionada: la primera semana
-/// (recorriendo phases → weeks en orden) que contiene algún día sin completar.
-/// Si todas las semanas están completas, devuelve la última. Null si no hay datos.
+/// La "semana actual" del PROGRAMA (no la natural): la primera semana,
+/// recorriendo phases → weeks en orden, que tiene algún día sin completar.
+/// Si todas están completas devuelve la última. Null si no hay datos.
+///
+/// Ojo: no avanza por calendario. Avanza cuando se completan los días.
 final selectedCurrentWeekProvider = Provider<TrainingWeek?>((ref) {
   final sub = ref.watch(selectedSubscriptionProvider);
   if (sub == null) return null;
@@ -136,119 +192,129 @@ final selectedCurrentWeekProvider = Provider<TrainingWeek?>((ref) {
   for (final phase in sub.phases) {
     for (final week in phase.weeks) {
       last = week;
-      if (week.days.any((d) => !d.isCompleted)) {
-        return week;
-      }
+      if (week.days.any((d) => !d.isCompleted)) return week;
     }
   }
-  return last; // todo completo → última semana (o null si no había semanas)
+  return last;
+});
+
+/// Índice, dentro de la semana actual, del primer día sin completar.
+/// Si la semana está entera hecha → 0.
+final initialDayIndexProvider = Provider<int>((ref) {
+  final week = ref.watch(selectedCurrentWeekProvider);
+  if (week == null || week.days.isEmpty) return 0;
+  final i = week.days.indexWhere((d) => !d.isCompleted);
+  return i < 0 ? 0 : i;
+});
+
+/// Día que el carrusel está mostrando ahora mismo. Lo escribe el PageView.
+final selectedDayIndexProvider = StateProvider<int>((ref) {
+  return ref.watch(initialDayIndexProvider);
 });
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 4: Ejecutar y ver que pasa**
 
 Run: `flutter test test/features/training/current_week_provider_test.dart`
-Expected: PASS (3 tests).
+Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add lib/features/training/presentation/providers/current_week_provider.dart test/features/training/current_week_provider_test.dart
-git commit -m "feat(entreno): provider de la semana actual para progreso semanal"
+git commit -m "feat(entreno): providers de semana actual y dia seleccionado"
 ```
 
 ---
 
-### Task 2: Claves de localización
+### Task 2: Textos (localización)
 
-**Files:**
-- Modify: `lib/l10n/app_es.arb`, `lib/l10n/app_en.arb`
-- (Regenera `lib/l10n/app_localizations*.dart`)
+**Files:** Modify `lib/l10n/app_es.arb`, `lib/l10n/app_en.arb`
 
 **Interfaces:**
-- Produces (getters en `S`): `viewProgram`, `replaceProgram`, `endProgram`, `addProgram`, `programWeekProgress(int week, int completed, int total)`, `endProgramTitle`, `endProgramMessage(String programName)`, `endProgramConfirm`, `replaceProgramTitle`, `replaceProgramMessage(String programName)`, `replaceProgramConfirm`.
+- Produces (getters en `S`): `viewProgram`, `endProgram`, `addProgram`, `programWeekProgress(int week, int completed, int total)`, `tagNextWorkout`, `tagCompleted`, `tagInProgress`, `endProgramTitle`, `endProgramMessage(String programName)`, `endProgramConfirm`.
+- Reutiliza los existentes: `exercise`, `exercises`, `days`, `cancel`.
 
-- [ ] **Step 1: Añadir claves a `app_es.arb`**
-
-Insertar (respetando el formato JSON del archivo; los parametrizados llevan bloque `"placeholders"`):
+- [ ] **Step 1: Añadir a `app_es.arb`**
 
 ```json
   "viewProgram": "Ver programa",
-  "replaceProgram": "Reemplazar programa",
   "endProgram": "Terminar programa",
   "addProgram": "Añadir programa",
+  "tagNextWorkout": "PRÓXIMO ENTRENO",
+  "tagCompleted": "COMPLETADO",
+  "tagInProgress": "EN CURSO",
   "programWeekProgress": "Semana {week} · {completed} de {total} entrenos",
   "@programWeekProgress": {
-    "description": "Progreso de la SEMANA DEL PROGRAMA (no la semana natural). No se resetea por calendario: avanza al completar los días.",
-    "placeholders": { "week": { "type": "int" }, "completed": { "type": "int" }, "total": { "type": "int" } }
+    "description": "Progreso de la SEMANA DEL PROGRAMA (no la natural). No se resetea por calendario.",
+    "placeholders": { "week": {"type":"int"}, "completed": {"type":"int"}, "total": {"type":"int"} }
   },
   "endProgramTitle": "¿Terminar programa?",
   "endProgramMessage": "Guardaremos tu progreso de {programName} en el historial. Podrás volver a empezarlo cuando quieras.",
   "@endProgramMessage": {
-    "placeholders": { "programName": { "type": "String" } }
+    "placeholders": { "programName": {"type":"String"} }
   },
-  "endProgramConfirm": "Terminar",
-  "replaceProgramTitle": "¿Reemplazar programa?",
-  "replaceProgramMessage": "Guardaremos el progreso de {programName} y elegirás un programa nuevo.",
-  "@replaceProgramMessage": {
-    "placeholders": { "programName": { "type": "String" } }
-  },
-  "replaceProgramConfirm": "Elegir nuevo"
+  "endProgramConfirm": "Terminar"
 ```
 
-- [ ] **Step 2: Añadir las mismas claves a `app_en.arb`**
+- [ ] **Step 2: Añadir a `app_en.arb`**
 
 ```json
   "viewProgram": "View program",
-  "replaceProgram": "Replace program",
   "endProgram": "End program",
   "addProgram": "Add program",
+  "tagNextWorkout": "NEXT WORKOUT",
+  "tagCompleted": "COMPLETED",
+  "tagInProgress": "IN PROGRESS",
   "programWeekProgress": "Week {week} · {completed} of {total} workouts",
   "@programWeekProgress": {
-    "description": "PROGRAM week progress (not the calendar week). Does not reset on Mondays: it advances as days are completed.",
-    "placeholders": { "week": { "type": "int" }, "completed": { "type": "int" }, "total": { "type": "int" } }
+    "description": "PROGRAM week progress (not the calendar week). Does not reset on Mondays.",
+    "placeholders": { "week": {"type":"int"}, "completed": {"type":"int"}, "total": {"type":"int"} }
   },
   "endProgramTitle": "End program?",
   "endProgramMessage": "We'll save your {programName} progress to your history. You can start it again anytime.",
   "@endProgramMessage": {
-    "placeholders": { "programName": { "type": "String" } }
+    "placeholders": { "programName": {"type":"String"} }
   },
-  "endProgramConfirm": "End",
-  "replaceProgramTitle": "Replace program?",
-  "replaceProgramMessage": "We'll save your {programName} progress and you'll pick a new program.",
-  "@replaceProgramMessage": {
-    "placeholders": { "programName": { "type": "String" } }
-  },
-  "replaceProgramConfirm": "Pick new"
+  "endProgramConfirm": "End"
 ```
 
-- [ ] **Step 3: Regenerar y verificar compilación**
+- [ ] **Step 3: Regenerar y comprobar**
 
-Run: `cd /Users/kataiturriaga/repos/elmetodo_app && flutter gen-l10n && flutter analyze lib/l10n`
-Expected: sin errores; getters nuevos presentes en `lib/l10n/app_localizations.dart`.
+Run: `flutter gen-l10n && flutter analyze lib/l10n`
+Expected: sin errores; los getters nuevos existen.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add lib/l10n/app_es.arb lib/l10n/app_en.arb lib/l10n/app_localizations*.dart
-git commit -m "i18n(entreno): claves para selector y gestión de programa"
+git add lib/l10n/
+git commit -m "i18n(entreno): textos del selector, tags y gestion de programa"
 ```
 
 ---
 
-### Task 3: Barra de progreso semanal
+### Task 3: Barra de progreso de la semana (3 estados)
 
 **Files:**
 - Create: `lib/features/training/presentation/widgets/weekly_progress_bar.dart`
 - Test: `test/features/training/weekly_progress_bar_preview_test.dart`
 
 **Interfaces:**
-- Consumes: `TrainingWeek` (`weekNumber`, `completedDays`, `totalDays`); `S.programWeekProgress`.
-- Produces: `class WeeklyProgressBar extends StatelessWidget` con constructor `const WeeklyProgressBar({super.key, required this.week})` donde `final TrainingWeek week;`. Renderiza una barra segmentada (una casilla por día, verde = completado) + label `programWeekProgress(week.weekNumber, week.completedDays, week.totalDays)` → **"Semana 1 · 1 de 6 entrenos"**.
+- Consumes: `TrainingWeek` (`weekNumber`, `days`, `completedDays`, `totalDays`), `TrainingDay.isCompleted`, `S.programWeekProgress`.
+- Produces: `class WeeklyProgressBar extends StatelessWidget` con
+  `const WeeklyProgressBar({super.key, required this.week, required this.selectedDayIndex})`.
 
-> **⚠️ Semántica de "semana" (decisión de producto, verificada en código):** la semana es la **del programa**, NO la natural del calendario. Verificado: `TrainingWeek` (front) y `MobileWeek` (API) solo tienen `weekNumber` (un contador 1,2,3…) y `days`; no hay fechas ni lógica de calendario (`isocalendar`/`weekday`/`timedelta`) en ninguno de los dos repos. **La barra NO se resetea los lunes**: la semana avanza solo cuando se completan sus días. Por eso el copy NO debe decir "esta semana" (implicaría calendario) sino **"Semana N"**.
+**🎨 Tres estados por casilla — el verde SIEMPRE gana:**
 
-- [ ] **Step 1: Write the widget**
+| Casilla | Token | Color (oscuro) |
+|---|---|---|
+| **Hecho** (`isCompleted`) — aunque esté seleccionada | `colors.brandPrimary` | `#00EE00` verde |
+| **Seleccionada** y NO hecha | `colors.strokeStrong` | `#6B6D71` gris claro |
+| **Pendiente** | `colors.strokeDivider` | `#3C3E41` gris oscuro |
+
+Orden obligatorio: `isCompleted` → verde; si no, `index == selectedDayIndex` → gris claro; si no → gris oscuro.
+
+- [ ] **Step 1: Implementar**
 
 ```dart
 // lib/features/training/presentation/widgets/weekly_progress_bar.dart
@@ -258,21 +324,33 @@ import '../../../../core/theme/theme.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/subscription_detail.dart';
 
-/// Barra de progreso de la semana **del programa** (no la natural): una
-/// casilla por día (verde = completado) + "Semana N · X de N entrenos".
-///
-/// No se resetea por calendario: la semana avanza cuando se completan sus días.
+/// Progreso de la semana DEL PROGRAMA (no la natural). Una casilla por día.
+/// No se resetea por calendario: avanza al completar los días.
 class WeeklyProgressBar extends StatelessWidget {
-  const WeeklyProgressBar({super.key, required this.week});
+  const WeeklyProgressBar({
+    super.key,
+    required this.week,
+    required this.selectedDayIndex,
+  });
 
   final TrainingWeek week;
+
+  /// Índice, dentro de [week.days], del día que muestra el carrusel.
+  final int selectedDayIndex;
+
+  Color _segmentColor(BuildContext context, int index) {
+    final colors = context.colors;
+    // El verde manda: un día hecho sigue verde aunque esté seleccionado.
+    if (week.days[index].isCompleted) return colors.brandPrimary;
+    if (index == selectedDayIndex) return colors.strokeStrong;
+    return colors.strokeDivider;
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = S.of(context);
     final colors = context.colors;
     final total = week.totalDays;
-    final done = week.completedDays;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,7 +362,7 @@ class WeeklyProgressBar extends StatelessWidget {
                 child: Container(
                   height: 5,
                   decoration: BoxDecoration(
-                    color: i < done ? colors.brandPrimary : colors.strokeDivider,
+                    color: _segmentColor(context, i),
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
@@ -295,7 +373,7 @@ class WeeklyProgressBar extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.s8),
         Text(
-          l10n.programWeekProgress(week.weekNumber, done, total),
+          l10n.programWeekProgress(week.weekNumber, week.completedDays, total),
           style: AppTypography.bodySmall.copyWith(color: colors.textSecondary),
         ),
       ],
@@ -304,73 +382,445 @@ class WeeklyProgressBar extends StatelessWidget {
 }
 ```
 
-- [ ] **Step 2: Write the golden test** (patrón de `next_training_card_preview_test.dart` — copiar `setUpAll(_loadFonts)` y `_pump` de ese archivo)
+- [ ] **Step 2: Golden test** (copiar `_loadFonts` y `_pump` de `next_training_card_preview_test.dart`)
 
 ```dart
 // test/features/training/weekly_progress_bar_preview_test.dart
-// (copiar _loadFonts y _pump de next_training_card_preview_test.dart)
-import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:elmetodo_app/features/training/domain/entities/subscription_detail.dart';
-import 'package:elmetodo_app/features/training/presentation/widgets/weekly_progress_bar.dart';
-// + imports de tema/l10n/fuentes idénticos al test de referencia
-
 TrainingWeek _week(int done, int total) => TrainingWeek(
       weekNumber: 1,
-      days: List.generate(total, (i) => TrainingDay(
-        id: i, dayOrder: i, name: 'D$i', isCompleted: i < done)),
+      days: List.generate(total,
+        (i) => TrainingDay(id: i, dayOrder: i, name: 'D$i', isCompleted: i < done)),
     );
 
 void main() {
   setUpAll(_loadFonts);
-  for (final theme in [ThemeMode.dark, ThemeMode.light]) {
-    final t = theme == ThemeMode.dark ? 'dark' : 'light';
-    testWidgets('weekly_progress 2de6 $t', (tester) async {
-      await _pump(tester, child: Padding(
-        padding: const EdgeInsets.all(16), child: WeeklyProgressBar(week: _week(2, 6))),
-        themeMode: theme);
-      await expectLater(find.byType(WeeklyProgressBar),
-        matchesGoldenFile('goldens/weekly_progress_2de6_$t.png'));
+
+  final scenarios = <String, Widget>{
+    // 2 verdes · la 3ª gris claro (seleccionada) · la 4ª gris oscuro
+    'tres_estados': WeeklyProgressBar(week: _week(2, 4), selectedDayIndex: 2),
+    // CLAVE: el día seleccionado ya está hecho → debe salir VERDE, no gris claro
+    'hecho_y_seleccionado': WeeklyProgressBar(week: _week(3, 4), selectedDayIndex: 1),
+    'todo_hecho': WeeklyProgressBar(week: _week(4, 4), selectedDayIndex: 3),
+  };
+
+  for (final e in scenarios.entries) {
+    for (final theme in [ThemeMode.dark, ThemeMode.light]) {
+      final t = theme == ThemeMode.dark ? 'dark' : 'light';
+      testWidgets('weekly_progress ${e.key} $t', (tester) async {
+        await _pump(tester,
+            child: Padding(padding: const EdgeInsets.all(16), child: e.value),
+            themeMode: theme);
+        await expectLater(find.byType(WeeklyProgressBar),
+            matchesGoldenFile('goldens/weekly_progress_${e.key}_$t.png'));
+      });
+    }
+  }
+}
+```
+
+- [ ] **Step 3: Generar y revisar a ojo**
+
+Run: `flutter test test/features/training/weekly_progress_bar_preview_test.dart --update-goldens`
+Expected: PASS (6). Abrir los PNG y confirmar:
+- `tres_estados_dark` → 2 verdes, 1 gris claro, 1 gris oscuro. Texto "Semana 1 · 2 de 4 entrenos".
+- `hecho_y_seleccionado_dark` → **3 verdes** (la 2ª está seleccionada pero hecha → verde). ← valida la regla.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add lib/features/training/presentation/widgets/weekly_progress_bar.dart test/features/training/weekly_progress_bar_preview_test.dart test/features/training/goldens/weekly_progress_*.png
+git commit -m "feat(entreno): barra de progreso semanal con tres estados"
+```
+
+---
+
+### Task 4: Card del entreno (4 tags, SIN botón)
+
+**Files:**
+- Create: `lib/features/training/presentation/widgets/next_workout_card.dart`
+- Test: `test/features/training/next_workout_card_preview_test.dart`
+
+**Diseño:** Figma `NextWorkoutCard` (node `1275:3358`, EMP DS Library). Component set con eje `State`: `Default` / `NextSesion` / `Completed`. **El botón existe en el componente pero está oculto en todas las variantes** → no implementarlo. Añadimos un 4º estado `InProgress` (naranja) que aún no está en Figma.
+
+**Interfaces:**
+- Consumes: `SubscriptionDetail.programImageUrl`; `TrainingDay` (`displayName`, `totalExercises`, `isCompleted`, `hasAnyExerciseStarted`); `AnimatedNetworkImage`, `AppEffects.gradientBlack`; `S.tagNextWorkout/tagCompleted/tagInProgress/exercise/exercises`; `context.colors.warning` (ya añadido).
+- Produces:
+  ```dart
+  enum WorkoutCardState { none, next, inProgress, completed }
+
+  class NextWorkoutCard extends StatelessWidget {
+    const NextWorkoutCard({
+      super.key,
+      required this.imageUrl,     // String? — imagen del programa
+      required this.trainingDay,
+      required this.state,
+      required this.onTap,        // la card ENTERA es tocable
+    });
+  }
+  ```
+
+**Los 4 estados:**
+
+| Estado | Tag | Color del tag | Cuándo |
+|---|---|---|---|
+| `completed` | COMPLETADO | verde `brandPrimary` | `day.isCompleted` |
+| `inProgress` | EN CURSO | **naranja `warning`** | `!isCompleted && hasAnyExerciseStarted` |
+| `next` | PRÓXIMO ENTRENO | verde `brandPrimary` | es el primer día sin completar de la semana |
+| `none` | *(sin tag)* | — | el resto (días futuros de la semana) |
+
+Prioridad al calcular: `completed` → `inProgress` → `next` → `none`.
+
+- [ ] **Step 1: Implementar**
+
+```dart
+// lib/features/training/presentation/widgets/next_workout_card.dart
+import 'package:flutter/material.dart';
+
+import '../../../../core/theme/theme.dart';
+import '../../../../core/widgets/images/animated_network_image.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../domain/entities/subscription_detail.dart';
+
+/// Estado visual de la card (lo comunica el tag; no hay botón).
+enum WorkoutCardState { none, next, inProgress, completed }
+
+/// Deriva el estado de un día. [isNext] = es el primer día sin completar
+/// de la semana.
+WorkoutCardState workoutCardStateFor(TrainingDay day, {required bool isNext}) {
+  if (day.isCompleted) return WorkoutCardState.completed;
+  if (day.hasAnyExerciseStarted) return WorkoutCardState.inProgress;
+  if (isNext) return WorkoutCardState.next;
+  return WorkoutCardState.none;
+}
+
+/// Card del entreno del día, sobre la imagen del programa.
+///
+/// NO tiene botón: la card entera es tocable (Figma: NextWorkoutCard, donde
+/// el botón está oculto en todas las variantes). El tag comunica el estado.
+class NextWorkoutCard extends StatelessWidget {
+  const NextWorkoutCard({
+    super.key,
+    required this.imageUrl,
+    required this.trainingDay,
+    required this.state,
+    required this.onTap,
+  });
+
+  final String? imageUrl;
+  final TrainingDay trainingDay;
+  final WorkoutCardState state;
+  final VoidCallback onTap;
+
+  ({String label, Color bg})? _tag(BuildContext context, S l10n) {
+    final colors = context.colors;
+    return switch (state) {
+      WorkoutCardState.completed =>
+        (label: l10n.tagCompleted, bg: colors.brandPrimary),
+      WorkoutCardState.inProgress =>
+        (label: l10n.tagInProgress, bg: colors.warning),
+      WorkoutCardState.next =>
+        (label: l10n.tagNextWorkout, bg: colors.brandPrimary),
+      WorkoutCardState.none => null,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = S.of(context);
+    final colors = context.colors;
+    final count = trainingDay.totalExercises;
+    final tag = _tag(context, l10n);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppSpacing.s16),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (imageUrl != null)
+              AnimatedNetworkImage(
+                imageUrl: imageUrl!,
+                fit: BoxFit.cover,
+                errorWidget: Container(color: colors.bgSurface1),
+              )
+            else
+              Container(color: colors.bgSurface1),
+
+            Container(
+              decoration: BoxDecoration(
+                gradient: AppEffects.gradientBlack,
+                backgroundBlendMode: BlendMode.multiply,
+              ),
+            ),
+
+            // Tag (arriba-izquierda). Sin tag en el estado `none`.
+            if (tag != null)
+              Positioned(
+                top: AppSpacing.s16,
+                left: AppSpacing.s16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s16, vertical: AppSpacing.s6),
+                  decoration: BoxDecoration(
+                    color: tag.bg,
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Text(
+                    tag.label,
+                    style: AppTypography.bodyXSmallBold.copyWith(
+                      color: colors.brandText, // negro sobre verde/naranja
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+
+            // Contenido inferior: nombre del día + nº de ejercicios.
+            // NO hay botón (decisión de diseño).
+            Positioned(
+              left: AppSpacing.s16,
+              right: AppSpacing.s16,
+              bottom: AppSpacing.s16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    trainingDay.displayName,
+                    style: AppTypography.bodyLarge.copyWith(
+                      color: colors.brandTextInverse,
+                      fontSize: 24,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: AppSpacing.s4),
+                  Text(
+                    '$count ${count == 1 ? l10n.exercise : l10n.exercises}',
+                    style: AppTypography.bodySmall
+                        .copyWith(color: colors.brandTextInverse),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+> Nota: el nombre del día viene de `displayName` (= `name`, p. ej. "Tren superior"). **No usar `trainingType`** (es una lista larga de músculos).
+
+- [ ] **Step 2: Golden test — los 4 estados**
+
+```dart
+// test/features/training/next_workout_card_preview_test.dart
+// (copiar _loadFonts / _pump; surface 390x340; imageUrl: null para render determinista)
+TrainingDay _day({bool done = false, bool started = false}) => TrainingDay(
+      id: 1, dayOrder: 1, name: 'Tren superior', isCompleted: done,
+      exercises: List.generate(7, (i) => DayExercise(
+        id: i, exerciseId: i, name: 'E$i', position: i,
+        planType: 'strength', logType: 'weight_reps',
+        completedSets: started ? 2 : null)),
+    );
+
+void main() {
+  setUpAll(_loadFonts);
+  final scenarios = {
+    'next': (day: _day(), state: WorkoutCardState.next),
+    'completed': (day: _day(done: true), state: WorkoutCardState.completed),
+    'in_progress': (day: _day(started: true), state: WorkoutCardState.inProgress),
+    'none': (day: _day(), state: WorkoutCardState.none),
+  };
+  for (final e in scenarios.entries) {
+    testWidgets('next_workout_card ${e.key} dark', (tester) async {
+      await _pump(tester,
+          child: SizedBox(height: 300, child: NextWorkoutCard(
+            imageUrl: null, trainingDay: e.value.day,
+            state: e.value.state, onTap: () {})),
+          themeMode: ThemeMode.dark);
+      await expectLater(find.byType(NextWorkoutCard),
+          matchesGoldenFile('goldens/workout_card_${e.key}.png'));
     });
   }
 }
 ```
 
-- [ ] **Step 3: Generate goldens & verify**
+- [ ] **Step 3: Generar y revisar**
 
-Run: `flutter test test/features/training/weekly_progress_bar_preview_test.dart --update-goldens`
-Expected: PASS; PNGs en `test/features/training/goldens/`. Abrir `weekly_progress_2de6_dark.png` y confirmar 2 casillas verdes de 6 + texto legible.
+Run: `flutter test test/features/training/next_workout_card_preview_test.dart --update-goldens`
+Expected: PASS (4). Revisar los PNG: tag verde en `next`/`completed`, **tag naranja en `in_progress`**, **sin tag** en `none`, y **ningún botón** en ninguno.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add lib/features/training/presentation/widgets/weekly_progress_bar.dart test/features/training/weekly_progress_bar_preview_test.dart test/features/training/goldens/weekly_progress_2de6_*.png
-git commit -m "feat(entreno): barra de progreso semanal"
+git add lib/features/training/presentation/widgets/next_workout_card.dart test/features/training/next_workout_card_preview_test.dart test/features/training/goldens/workout_card_*.png
+git commit -m "feat(entreno): card del entreno con 4 tags y sin boton"
 ```
 
 ---
 
-### Task 4: Selector de programa (título-dropdown)
+### Task 5: Carrusel de los días de la semana
+
+**Files:**
+- Create: `lib/features/training/presentation/widgets/week_days_pager.dart`
+- Test: `test/features/training/week_days_pager_test.dart`
+
+**Interfaces:**
+- Consumes: `NextWorkoutCard` + `workoutCardStateFor` (Task 4); providers `selectedCurrentWeekProvider`, `selectedDayIndexProvider`, `initialDayIndexProvider`, `selectedSubscriptionProvider`; ruta `AppRoutes.trainingDay`.
+- Produces: `class WeekDaysPager extends ConsumerStatefulWidget` — `const WeekDaysPager({super.key})`. Un `PageView` sobre `currentWeek.days` **solo de la semana actual**, arrancando en `initialDayIndexProvider`, con **dots debajo** (affordance: sin ellos el gesto es invisible). Al cambiar de página escribe `selectedDayIndexProvider`. Al tocar una card, navega al día.
+
+- [ ] **Step 1: Implementar**
+
+```dart
+// lib/features/training/presentation/widgets/week_days_pager.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/router/app_router.dart';
+import '../../../../core/theme/theme.dart';
+import '../../domain/entities/subscription_detail.dart';
+import '../providers/current_week_provider.dart';
+import '../providers/training_providers.dart';
+import 'next_workout_card.dart';
+
+/// Carrusel de los días de la SEMANA ACTUAL. No llega a otras semanas
+/// (para eso está "Ver programa" en el menú ⋮).
+class WeekDaysPager extends ConsumerStatefulWidget {
+  const WeekDaysPager({super.key});
+
+  @override
+  ConsumerState<WeekDaysPager> createState() => _WeekDaysPagerState();
+}
+
+class _WeekDaysPagerState extends ConsumerState<WeekDaysPager> {
+  PageController? _controller;
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final week = ref.watch(selectedCurrentWeekProvider);
+    final sub = ref.watch(selectedSubscriptionProvider);
+    if (week == null || week.days.isEmpty || sub == null) {
+      return const SizedBox.shrink();
+    }
+
+    final initial = ref.watch(initialDayIndexProvider);
+    _controller ??= PageController(initialPage: initial, viewportFraction: 1.0);
+
+    final selected = ref.watch(selectedDayIndexProvider);
+    // El "próximo" es el primer día sin completar de la semana.
+    final nextIndex = week.days.indexWhere((d) => !d.isCompleted);
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 300,
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: week.days.length,
+            onPageChanged: (i) =>
+                ref.read(selectedDayIndexProvider.notifier).state = i,
+            itemBuilder: (context, i) {
+              final day = week.days[i];
+              return Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+                child: NextWorkoutCard(
+                  imageUrl: sub.programImageUrl,
+                  trainingDay: day,
+                  state: workoutCardStateFor(day, isNext: i == nextIndex),
+                  onTap: () => _openDay(context, sub, week, day),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s8),
+        // Dots: sin esto, nadie descubre que la card se desliza.
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(week.days.length, (i) {
+            final isSel = i == selected;
+            final isDone = week.days[i].isCompleted;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: isSel ? 18 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                color: isDone
+                    ? context.colors.brandPrimary
+                    : isSel
+                        ? context.colors.strokeStrong
+                        : context.colors.strokeDivider,
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  void _openDay(BuildContext context, SubscriptionDetail sub,
+      TrainingWeek week, TrainingDay day) {
+    context.push(AppRoutes.trainingDay, extra: {
+      'trainingDay': day,
+      'totalDaysInWeek': week.days.length,
+      'subscriptionId': sub.id,
+      'weekNumber': week.weekNumber,
+    });
+  }
+}
+```
+
+- [ ] **Step 2: Widget test** (patrón de `marcas_section_test.dart`, con overrides)
+
+```dart
+// test/features/training/week_days_pager_test.dart
+// ProviderScope(overrides: [selectedSubscriptionProvider, selectedCurrentWeekProvider...])
+// Verificar:
+//  - Se renderizan tantas NextWorkoutCard como días tiene la semana (find.byType, en el PageView solo la visible).
+//  - Arranca en el primer día sin completar (el visible es ese).
+//  - Hay tantos dots como días.
+```
+
+- [ ] **Step 3: Ejecutar**
+
+Run: `flutter test test/features/training/week_days_pager_test.dart`
+Expected: PASS.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add lib/features/training/presentation/widgets/week_days_pager.dart test/features/training/week_days_pager_test.dart
+git commit -m "feat(entreno): carrusel de dias de la semana con dots"
+```
+
+---
+
+### Task 6: Selector de programa (título-dropdown)
 
 **Files:**
 - Create: `lib/features/training/presentation/widgets/program_selector_button.dart`
 - Test: `test/features/training/program_selector_button_preview_test.dart`
 
 **Interfaces:**
-- Consumes: `List<SubscriptionDetail> subscriptions`, `int selectedIndex`, callbacks `ValueChanged<int> onSelect` y `VoidCallback onAddProgram`. Campos de `SubscriptionDetail`: `programName`, `daysPerWeek`. `S.addProgram`, `S.days`.
-- Produces: `class ProgramSelectorButton extends StatelessWidget` con:
-  ```dart
-  const ProgramSelectorButton({
-    super.key,
-    required this.subscriptions,
-    required this.selectedIndex,
-    required this.onSelect,
-    required this.onAddProgram,
-  });
-  ```
-  Título grande = `"${sub.programName} - ${sub.daysPerWeek} ${l10n.days}"` con `Icon(Icons.keyboard_arrow_down)`. Al pulsar abre un `PopupMenuButton`-equivalente (patrón `MarcaSelector`, `marca_dropdown.dart`): items = cada subscripción (marcada con check si es la seleccionada, en `brandPrimary`) + separador + item "＋ Añadir programa". Selección → `onSelect(index)`; añadir → `onAddProgram()`.
+- Consumes: `List<SubscriptionDetail>`, `int selectedIndex`, `ValueChanged<int> onSelect`, `VoidCallback onAddProgram`; `SubscriptionDetail.programName` y `.daysPerWeek`; `S.addProgram`, `S.days`. Patrón visual: `MarcaSelector` (`widgets/marcas/marca_dropdown.dart`) — es el dropdown canónico de la app.
+- Produces: `class ProgramSelectorButton extends StatelessWidget` con
+  `const ProgramSelectorButton({super.key, required this.subscriptions, required this.selectedIndex, required this.onSelect, required this.onAddProgram})`.
+- Título: `"${programName} - ${daysPerWeek} ${l10n.days}"` → **"Masa magra - 4 días"** (los programas reales son de 3/4/5 días; `daysPerWeek` los cuenta de verdad).
 
-- [ ] **Step 1: Implement widget** (seguir el patrón visual de `MarcaSelector` en `lib/features/training/presentation/widgets/marcas/marca_dropdown.dart`)
+- [ ] **Step 1: Implementar**
 
 ```dart
 // lib/features/training/presentation/widgets/program_selector_button.dart
@@ -380,12 +830,10 @@ import '../../../../core/theme/theme.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/subscription_detail.dart';
 
-/// Valor especial para el item "Añadir programa" del menú.
 const int _kAddProgram = -1;
 
-/// Título del programa como botón-dropdown. Muestra
-/// "Nombre - N días ▾" y abre un menú para cambiar de programa activo
-/// o añadir uno nuevo.
+/// Nombre del programa como botón-dropdown: "Masa magra - 4 días ▾".
+/// Abre un menú para cambiar de programa activo o añadir uno nuevo.
 class ProgramSelectorButton extends StatelessWidget {
   const ProgramSelectorButton({
     super.key,
@@ -404,68 +852,54 @@ class ProgramSelectorButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = S.of(context);
     final colors = context.colors;
-    final safeIndex = selectedIndex.clamp(0, subscriptions.length - 1);
-    final current = subscriptions[safeIndex];
+    final i = selectedIndex.clamp(0, subscriptions.length - 1);
+    final current = subscriptions[i];
     final title = '${current.programName} - ${current.daysPerWeek} ${l10n.days}';
 
     return PopupMenuButton<int>(
       offset: const Offset(0, 44),
       color: colors.bgSurface2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+        borderRadius: BorderRadius.circular(AppSpacing.s8),
         side: BorderSide(color: colors.strokeDivider),
       ),
-      onSelected: (value) {
-        if (value == _kAddProgram) {
-          onAddProgram();
-        } else {
-          onSelect(value);
-        }
-      },
+      onSelected: (v) => v == _kAddProgram ? onAddProgram() : onSelect(v),
       itemBuilder: (context) => [
-        for (int i = 0; i < subscriptions.length; i++)
+        for (int j = 0; j < subscriptions.length; j++)
           PopupMenuItem<int>(
-            value: i,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    subscriptions[i].programName,
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: i == safeIndex ? colors.brandPrimary : colors.textPrimary,
-                      fontWeight: i == safeIndex ? FontWeight.w700 : FontWeight.w400,
-                    ),
-                  ),
+            value: j,
+            child: Row(children: [
+              Expanded(child: Text(
+                subscriptions[j].programName,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: j == i ? colors.brandPrimary : colors.textPrimary,
+                  fontWeight: j == i ? FontWeight.w700 : FontWeight.w400,
                 ),
-                if (i == safeIndex)
-                  Icon(Icons.check, size: 18, color: colors.brandPrimary),
-              ],
-            ),
+              )),
+              if (j == i) Icon(Icons.check, size: 18, color: colors.brandPrimary),
+            ]),
           ),
         const PopupMenuDivider(),
         PopupMenuItem<int>(
           value: _kAddProgram,
-          child: Row(
-            children: [
-              Icon(Icons.add, size: 18, color: colors.brandPrimary),
-              const SizedBox(width: AppSpacing.s8),
-              Text(l10n.addProgram,
-                  style: AppTypography.bodyMedium.copyWith(color: colors.textSecondary)),
-            ],
-          ),
+          child: Row(children: [
+            Icon(Icons.add, size: 18, color: colors.brandPrimary),
+            const SizedBox(width: AppSpacing.s8),
+            Text(l10n.addProgram,
+                style: AppTypography.bodyMedium
+                    .copyWith(color: colors.textSecondary)),
+          ]),
         ),
       ],
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Flexible(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTypography.bodyLarge.copyWith(color: colors.textPrimary),
-            ),
-          ),
+          Flexible(child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.bodyLarge.copyWith(color: colors.textPrimary),
+          )),
           const SizedBox(width: AppSpacing.s6),
           Icon(Icons.keyboard_arrow_down, size: 20, color: colors.textSecondary),
         ],
@@ -475,21 +909,9 @@ class ProgramSelectorButton extends StatelessWidget {
 }
 ```
 
-> Verificar que `AppSpacing.radiusMedium` existe (el informe lo lista); si no, usar `AppSpacing.s8`.
+- [ ] **Step 2: Golden test** (2 subscripciones, `selectedIndex: 0`, dark + light) → `goldens/program_selector_<theme>.png`. Confirmar que muestra **"Masa magra - 4 días ▾"**.
 
-- [ ] **Step 2: Golden test** (dropdown cerrado, dark + light) — mismo patrón. Escenario: 2 subscripciones, `selectedIndex: 0`.
-
-```dart
-// test/features/training/program_selector_button_preview_test.dart
-// (copiar _loadFonts / _pump). Construir 2 SubscriptionDetail de prueba.
-// Render: ProgramSelectorButton(subscriptions: subs, selectedIndex: 0, onSelect: (_) {}, onAddProgram: () {})
-// expectLater → goldens/program_selector_<theme>.png
-```
-
-- [ ] **Step 3: Generate & verify**
-
-Run: `flutter test test/features/training/program_selector_button_preview_test.dart --update-goldens`
-Expected: PASS; el golden muestra "Nombre - 6 días ▾".
+- [ ] **Step 3:** `flutter test test/features/training/program_selector_button_preview_test.dart --update-goldens` → PASS.
 
 - [ ] **Step 4: Commit**
 
@@ -500,17 +922,17 @@ git commit -m "feat(entreno): selector de programa (titulo-dropdown)"
 
 ---
 
-### Task 5: Diálogo de confirmación "Terminar programa"
+### Task 7: Diálogo "Terminar programa"
 
 **Files:**
 - Create: `lib/core/widgets/common/end_program_dialog.dart`
 - Test: `test/features/training/end_program_dialog_test.dart`
 
 **Interfaces:**
-- Consumes: `S.endProgramTitle`, `S.endProgramMessage(programName)`, `S.endProgramConfirm`, `S.cancel`; patrón visual de `DeleteActivityDialog` (`lib/features/activities/presentation/widgets/delete_activity_dialog.dart`); `AppButton` + `AppButtonVariant.outlined` / `AppButtonVariant.destructive`.
-- Produces: `Future<bool> showEndProgramDialog({required BuildContext context, required String programName})` — devuelve `true` si el usuario confirma, `false`/`null→false` si cancela.
+- Consumes: `S.endProgramTitle/endProgramMessage/endProgramConfirm/cancel`; `AppButton` + `AppButtonVariant.outlined` / `.destructive`. Patrón: `DeleteActivityDialog` (`features/activities/presentation/widgets/delete_activity_dialog.dart`).
+- Produces: `Future<bool> showEndProgramDialog({required BuildContext context, required String programName})` — `true` si confirma.
 
-- [ ] **Step 1: Implement dialog** (calcar `DeleteActivityDialog.show`, cambiando textos)
+- [ ] **Step 1: Implementar** (calcar `DeleteActivityDialog`, cambiando textos)
 
 ```dart
 // lib/core/widgets/common/end_program_dialog.dart
@@ -520,8 +942,7 @@ import '../../theme/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../buttons/app_button.dart';
 
-/// Confirmación para terminar (archivar) un programa. Conserva el progreso.
-/// Devuelve true si el usuario confirma.
+/// Confirmación para terminar un programa. Archiva: CONSERVA el progreso.
 Future<bool> showEndProgramDialog({
   required BuildContext context,
   required String programName,
@@ -533,7 +954,8 @@ Future<bool> showEndProgramDialog({
       final colors = context.colors;
       return Dialog(
         backgroundColor: colors.bgSurface1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.s16)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.s16)),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.s24),
           child: Column(
@@ -541,32 +963,28 @@ Future<bool> showEndProgramDialog({
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(l10n.endProgramTitle,
-                  style: AppTypography.bodyLarge.copyWith(color: colors.textPrimary),
+                  style: AppTypography.bodyLarge
+                      .copyWith(color: colors.textPrimary),
                   textAlign: TextAlign.center),
               const SizedBox(height: AppSpacing.s8),
               Text(l10n.endProgramMessage(programName),
-                  style: AppTypography.bodySmall.copyWith(color: colors.textSecondary),
+                  style: AppTypography.bodySmall
+                      .copyWith(color: colors.textSecondary),
                   textAlign: TextAlign.center),
               const SizedBox(height: AppSpacing.s24),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppButton(
-                      label: l10n.cancel,
-                      variant: AppButtonVariant.outlined,
-                      onPressed: () => Navigator.of(context).pop(false),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.s8),
-                  Expanded(
-                    child: AppButton(
-                      label: l10n.endProgramConfirm,
-                      variant: AppButtonVariant.destructive,
-                      onPressed: () => Navigator.of(context).pop(true),
-                    ),
-                  ),
-                ],
-              ),
+              Row(children: [
+                Expanded(child: AppButton(
+                  label: l10n.cancel,
+                  variant: AppButtonVariant.outlined,
+                  onPressed: () => Navigator.of(context).pop(false),
+                )),
+                const SizedBox(width: AppSpacing.s8),
+                Expanded(child: AppButton(
+                  label: l10n.endProgramConfirm,
+                  variant: AppButtonVariant.destructive,
+                  onPressed: () => Navigator.of(context).pop(true),
+                )),
+              ]),
             ],
           ),
         ),
@@ -577,21 +995,11 @@ Future<bool> showEndProgramDialog({
 }
 ```
 
-> Verificar la firma real de `AppButton` (props `label`, `variant`, `onPressed`) en `lib/core/widgets/buttons/app_button.dart` y ajustar (el informe confirma `AppButtonVariant.outlined` y `.destructive`).
+> Verificar la firma real de `AppButton` en `lib/core/widgets/buttons/app_button.dart`.
 
-- [ ] **Step 2: Write widget test** (verifica que confirmar devuelve true)
+- [ ] **Step 2: Widget test** — tocar "Terminar" devuelve `true`; tocar "Cancelar" devuelve `false`.
 
-```dart
-// test/features/training/end_program_dialog_test.dart
-// Bombear un Scaffold con un botón que llame showEndProgramDialog y guarde el resultado.
-// tester.tap del botón → pumpAndSettle → tap en "Terminar" → expect result == true.
-// Repetir tap en "Cancelar" → expect result == false.
-```
-
-- [ ] **Step 3: Run test**
-
-Run: `flutter test test/features/training/end_program_dialog_test.dart`
-Expected: PASS.
+- [ ] **Step 3:** `flutter test test/features/training/end_program_dialog_test.dart` → PASS.
 
 - [ ] **Step 4: Commit**
 
@@ -602,26 +1010,18 @@ git commit -m "feat(entreno): dialogo de confirmacion terminar programa"
 
 ---
 
-### Task 6: Menú de acciones del programa (kebab ⋮)
+### Task 8: Menú ⋮ (Ver programa / Terminar programa)
 
 **Files:**
 - Create: `lib/features/training/presentation/widgets/program_actions_menu.dart`
 - Test: `test/features/training/program_actions_menu_test.dart`
 
 **Interfaces:**
-- Consumes: callbacks `VoidCallback onViewProgram`, `onReplaceProgram`, `onEndProgram`; `S.viewProgram/replaceProgram/endProgram`; patrón `PopupMenuButton` con `Icons.more_vert`.
-- Produces: `class ProgramActionsMenu extends StatelessWidget`:
-  ```dart
-  const ProgramActionsMenu({
-    super.key,
-    required this.onViewProgram,
-    required this.onReplaceProgram,
-    required this.onEndProgram,
-  });
-  ```
-  Un `PopupMenuButton<_ProgramAction>` con icono `Icons.more_vert` y 3 items; "Terminar" en `colors.destructive`.
+- Consumes: `VoidCallback onViewProgram`, `onEndProgram`; `S.viewProgram/endProgram`.
+- Produces: `class ProgramActionsMenu extends StatelessWidget` —
+  `const ProgramActionsMenu({super.key, required this.onViewProgram, required this.onEndProgram})`. `PopupMenuButton` con `Icons.more_vert` y **2 items**; "Terminar" en `colors.destructive`.
 
-- [ ] **Step 1: Implement widget**
+- [ ] **Step 1: Implementar**
 
 ```dart
 // lib/features/training/presentation/widgets/program_actions_menu.dart
@@ -630,18 +1030,16 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../l10n/app_localizations.dart';
 
-enum _ProgramAction { view, replace, end }
+enum _ProgramAction { view, end }
 
 class ProgramActionsMenu extends StatelessWidget {
   const ProgramActionsMenu({
     super.key,
     required this.onViewProgram,
-    required this.onReplaceProgram,
     required this.onEndProgram,
   });
 
   final VoidCallback onViewProgram;
-  final VoidCallback onReplaceProgram;
   final VoidCallback onEndProgram;
 
   @override
@@ -652,22 +1050,16 @@ class ProgramActionsMenu extends StatelessWidget {
       icon: Icon(Icons.more_vert, color: colors.textSecondary),
       color: colors.bgSurface2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+        borderRadius: BorderRadius.circular(AppSpacing.s8),
         side: BorderSide(color: colors.strokeDivider),
       ),
-      onSelected: (action) {
-        switch (action) {
-          case _ProgramAction.view: onViewProgram();
-          case _ProgramAction.replace: onReplaceProgram();
-          case _ProgramAction.end: onEndProgram();
-        }
+      onSelected: (a) => switch (a) {
+        _ProgramAction.view => onViewProgram(),
+        _ProgramAction.end => onEndProgram(),
       },
       itemBuilder: (context) => [
         PopupMenuItem(value: _ProgramAction.view,
           child: Text(l10n.viewProgram,
-            style: AppTypography.bodyMedium.copyWith(color: colors.textPrimary))),
-        PopupMenuItem(value: _ProgramAction.replace,
-          child: Text(l10n.replaceProgram,
             style: AppTypography.bodyMedium.copyWith(color: colors.textPrimary))),
         PopupMenuItem(value: _ProgramAction.end,
           child: Text(l10n.endProgram,
@@ -678,41 +1070,32 @@ class ProgramActionsMenu extends StatelessWidget {
 }
 ```
 
-- [ ] **Step 2: Widget test** — abrir el menú y verificar que aparecen los 3 labels y que tocar cada uno dispara su callback.
+- [ ] **Step 2: Widget test** — abrir el menú, ver los 2 textos, comprobar que cada uno dispara su callback.
 
-```dart
-// test/features/training/program_actions_menu_test.dart
-// Render ProgramActionsMenu con 3 flags booleanas en callbacks.
-// tester.tap(find.byIcon(Icons.more_vert)); pumpAndSettle();
-// expect(find.text('Ver programa'), findsOneWidget); etc.
-// tap en 'Terminar programa' → expect endTapped == true.
-```
-
-- [ ] **Step 3: Run test**
-
-Run: `flutter test test/features/training/program_actions_menu_test.dart`
-Expected: PASS.
+- [ ] **Step 3:** `flutter test test/features/training/program_actions_menu_test.dart` → PASS.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add lib/features/training/presentation/widgets/program_actions_menu.dart test/features/training/program_actions_menu_test.dart
-git commit -m "feat(entreno): menu de acciones del programa (kebab)"
+git commit -m "feat(entreno): menu de acciones del programa"
 ```
 
 ---
 
-### Task 7: Fila de header (selector + kebab) con lógica de acciones
+### Task 9: Fila de header (selector + ⋮ + acciones)
 
 **Files:**
 - Create: `lib/features/training/presentation/widgets/program_header_row.dart`
 - Test: `test/features/training/program_header_row_test.dart`
 
 **Interfaces:**
-- Consumes: `ProgramSelectorButton` (Task 4), `ProgramActionsMenu` (Task 6), `showEndProgramDialog` (Task 5); providers `trainingContentNotifierProvider`, `selectedSubscriptionIndexProvider`, `selectedSubscriptionProvider`, `hasActiveSubscriptionsNotifierProvider`, `trainingRepositoryProvider` (`.archiveProgram`); rutas `AppRoutes.programsCatalog`, `AppRoutes.programDetail`.
-- Produces: `class ProgramHeaderRow extends ConsumerWidget` con `const ProgramHeaderRow({super.key, required this.subscriptions})` (`final List<SubscriptionDetail> subscriptions;`). Compone la fila y contiene los handlers de navegación/gestión.
+- Consumes: `ProgramSelectorButton` (T6), `ProgramActionsMenu` (T8), `showEndProgramDialog` (T7); providers `selectedSubscriptionIndexProvider`, `selectedSubscriptionProvider`, `trainingContentNotifierProvider`, `hasActiveSubscriptionsNotifierProvider`, `trainingRepositoryProvider`; rutas `AppRoutes.programsCatalog`, **`AppRoutes.trainingSession`**.
+- Produces: `class ProgramHeaderRow extends ConsumerWidget` — `const ProgramHeaderRow({super.key, required this.subscriptions})`.
 
-- [ ] **Step 1: Implement widget con handlers**
+> ⚠️ **"Ver programa" va a `AppRoutes.trainingSession`** (`TrainingSessionScreen` = la estructura de TU programa: fases, pestañas de semana y cards de día). **NO** a `AppRoutes.programDetail`, que es la ficha del **catálogo** para inscribirse. Este era el destino original de la card de programa (`active_programs_section.dart:55`).
+
+- [ ] **Step 1: Implementar**
 
 ```dart
 // lib/features/training/presentation/widgets/program_header_row.dart
@@ -721,7 +1104,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_router.dart';
-import '../../../../core/theme/theme.dart';
 import '../../../../core/widgets/common/end_program_dialog.dart';
 import '../../domain/entities/subscription_detail.dart';
 import '../providers/training_providers.dart';
@@ -750,259 +1132,50 @@ class ProgramHeaderRow extends ConsumerWidget {
           ),
         ),
         ProgramActionsMenu(
-          onViewProgram: () {
-            if (current != null) {
-              context.push(AppRoutes.programDetail, extra: current.programId);
-            }
-          },
-          onReplaceProgram: () => _replaceProgram(context, ref, current),
+          // Estructura del programa inscrito (fases/semanas/días), NO el catálogo.
+          onViewProgram: () => context.push(AppRoutes.trainingSession),
           onEndProgram: () => _endProgram(context, ref, current),
         ),
       ],
     );
   }
 
+  /// Terminar = archivar (CONSERVA el progreso en el historial).
+  /// NUNCA usar unsubscribeFromProgram: borra el progreso para siempre.
   Future<void> _endProgram(
       BuildContext context, WidgetRef ref, SubscriptionDetail? sub) async {
     if (sub == null) return;
-    final confirmed = await showEndProgramDialog(
+    final ok = await showEndProgramDialog(
         context: context, programName: sub.programName);
-    if (!confirmed) return;
+    if (!ok) return;
     await ref.read(trainingRepositoryProvider).archiveProgram(sub.id);
     ref.read(selectedSubscriptionIndexProvider.notifier).state = 0;
     ref.invalidate(trainingContentNotifierProvider);
     ref.invalidate(hasActiveSubscriptionsNotifierProvider);
-  }
-
-  Future<void> _replaceProgram(
-      BuildContext context, WidgetRef ref, SubscriptionDetail? sub) async {
-    if (sub == null) return;
-    // Reemplazar = archivar el actual (conserva progreso) y elegir uno nuevo
-    // en el catálogo. (El endpoint v2 /replace no está cableado en la app.)
-    final confirmed = await showEndProgramDialog(
-        context: context, programName: sub.programName);
-    if (!confirmed) return;
-    await ref.read(trainingRepositoryProvider).archiveProgram(sub.id);
-    ref.read(selectedSubscriptionIndexProvider.notifier).state = 0;
-    ref.invalidate(trainingContentNotifierProvider);
-    ref.invalidate(hasActiveSubscriptionsNotifierProvider);
-    if (context.mounted) context.push(AppRoutes.programsCatalog);
   }
 }
 ```
 
-> Nota de diseño: "Reemplazar" reutiliza el diálogo de terminar (misma consecuencia: se archiva el actual). Si se quiere un copy propio, usar `S.replaceProgramTitle/Message/Confirm` con un diálogo hermano. Para MVP se acepta reutilizar. Verificar firma `archiveProgram(int id, {bool keepProgress = true})` — por defecto archiva conservando progreso (repo interface L102).
+> Verificar la firma `archiveProgram(int id, {bool keepProgress = true})` (repo interface L102): por defecto archiva conservando el progreso. Copiar el patrón de invalidación de `program_completed_card.dart:57-141`.
 
-- [ ] **Step 2: Widget test con overrides** (patrón `marcas_section_test.dart`)
+- [ ] **Step 2: Widget test** con overrides: se ve "Masa magra - 4 días"; al tocar ⋮ aparecen "Ver programa" y "Terminar programa".
 
-```dart
-// test/features/training/program_header_row_test.dart
-// ProviderScope(overrides: [
-//   trainingContentNotifierProvider.overrideWith(...),  // 2 subs
-//   selectedSubscriptionIndexProvider / selectedSubscriptionProvider según haga falta
-// ]) → MaterialApp(theme: AppTheme.dark(), home: Scaffold(body: ProgramHeaderRow(subscriptions: subs)))
-// Verificar: aparece el título "Nombre - N días", y el icono more_vert.
-// tap more_vert → pumpAndSettle → find.text('Ver programa') findsOneWidget.
-```
-
-- [ ] **Step 3: Run test**
-
-Run: `flutter test test/features/training/program_header_row_test.dart`
-Expected: PASS.
+- [ ] **Step 3:** `flutter test test/features/training/program_header_row_test.dart` → PASS.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add lib/features/training/presentation/widgets/program_header_row.dart test/features/training/program_header_row_test.dart
-git commit -m "feat(entreno): fila de header con selector y gestion de programa"
+git commit -m "feat(entreno): header con selector y gestion de programa"
 ```
 
 ---
 
-### Task 8: Card héroe = siguiente entreno sobre imagen del programa
+### Task 10: Integrar todo en MainEntrenoScreen
 
-**Files:**
-- Create: `lib/features/training/presentation/widgets/next_training_hero_card.dart`
-- Test: `test/features/training/next_training_hero_card_preview_test.dart`
+**Files:** Modify `lib/features/training/presentation/screens/main_entreno_screen.dart` (`_ProgramsTab`, L206–275)
 
-**Interfaces:**
-- Consumes: `SubscriptionDetail` (`programImageUrl`), `TrainingDay` (`displayName`, `trainingType`, `totalExercises`); `AnimatedNetworkImage`, `AppEffects.gradientBlack`, `S.nextWorkout/train/exercise/exercises`; callback `VoidCallback onStartTraining`.
-- Produces: `class NextTrainingHeroCard extends StatelessWidget`:
-  ```dart
-  const NextTrainingHeroCard({
-    super.key,
-    required this.subscription,
-    required this.trainingDay,
-    required this.onStartTraining,
-  });
-  ```
-  Card con la imagen del programa a sangre + gradiente (base de `_ActiveProgramCard`), badge "PRÓXIMO ENTRENO" (verde) arriba-izquierda, y sobre el gradiente inferior: nombre del día (`displayName`), meta (`trainingType` + `totalExercises` ejercicios), y **botón verde sólido "Entrenar →"** (mismo estilo que `NextTrainingCard` ya redisñada).
-
-- [ ] **Step 1: Implement widget** (combina imagen de `_ActiveProgramCard` + contenido/botón de `NextTrainingCard`)
-
-```dart
-// lib/features/training/presentation/widgets/next_training_hero_card.dart
-import 'package:flutter/material.dart';
-
-import '../../../../core/theme/theme.dart';
-import '../../../../core/widgets/images/animated_network_image.dart';
-import '../../../../l10n/app_localizations.dart';
-import '../../domain/entities/subscription_detail.dart';
-
-/// Card héroe única de la pantalla Entreno: la sesión que toca ("siguiente
-/// entreno") sobre la imagen del programa, con botón verde sólido.
-class NextTrainingHeroCard extends StatelessWidget {
-  const NextTrainingHeroCard({
-    super.key,
-    required this.subscription,
-    required this.trainingDay,
-    required this.onStartTraining,
-  });
-
-  final SubscriptionDetail subscription;
-  final TrainingDay trainingDay;
-  final VoidCallback onStartTraining;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = S.of(context);
-    final colors = context.colors;
-    final focus = trainingDay.trainingType;
-    final count = trainingDay.totalExercises;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppSpacing.s16),
-      child: SizedBox(
-        height: 300,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (subscription.programImageUrl != null)
-              AnimatedNetworkImage(
-                imageUrl: subscription.programImageUrl!,
-                fit: BoxFit.cover,
-                errorWidget: Container(color: colors.bgSurface1),
-              )
-            else
-              Container(color: colors.bgSurface1),
-            Container(
-              decoration: BoxDecoration(
-                gradient: AppEffects.gradientBlack,
-                backgroundBlendMode: BlendMode.multiply,
-              ),
-            ),
-            // Badge
-            Positioned(
-              top: AppSpacing.s16, left: AppSpacing.s16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s16, vertical: AppSpacing.s6),
-                decoration: BoxDecoration(
-                  color: colors.brandPrimary,
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Text(
-                  l10n.nextWorkout.replaceAll(':', '').toUpperCase(),
-                  style: AppTypography.bodyXSmallBold.copyWith(
-                      color: colors.brandText, letterSpacing: 0.5),
-                ),
-              ),
-            ),
-            // Contenido inferior
-            Positioned(
-              left: AppSpacing.s16, right: AppSpacing.s16, bottom: AppSpacing.s16,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    trainingDay.displayName,
-                    style: AppTypography.bodyLarge.copyWith(
-                        color: colors.brandTextInverse, fontSize: 24),
-                  ),
-                  const SizedBox(height: AppSpacing.s4),
-                  Text(
-                    [
-                      if (focus != null && focus.isNotEmpty) focus,
-                      '$count ${count == 1 ? l10n.exercise : l10n.exercises}',
-                    ].join(' · '),
-                    style: AppTypography.bodySmall.copyWith(
-                        color: colors.brandTextInverse.withValues(alpha: 0.85)),
-                  ),
-                  const SizedBox(height: AppSpacing.s16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: Material(
-                      color: colors.brandPrimary,
-                      borderRadius: BorderRadius.circular(AppSpacing.s8),
-                      child: InkWell(
-                        onTap: onStartTraining,
-                        borderRadius: BorderRadius.circular(AppSpacing.s8),
-                        child: Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(l10n.train,
-                                  style: AppTypography.bodyMediumBold
-                                      .copyWith(color: colors.brandText)),
-                              const SizedBox(width: AppSpacing.s6),
-                              Icon(Icons.arrow_forward,
-                                  size: 18, color: colors.brandText),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-```
-
-> Verificar el nombre del método de alpha (`withValues(alpha:)` en Flutter reciente vs `withOpacity`) según la versión del repo — usar el que ya use `_ActiveProgramCard`. En golden test, `programImageUrl` null → cae al `Container` de color (la red no carga en test).
-
-- [ ] **Step 2: Golden test** (dark + light; imageUrl null para render determinista)
-
-```dart
-// test/features/training/next_training_hero_card_preview_test.dart
-// (copiar _loadFonts / _pump; surface 390x360)
-// sub con programImageUrl: null; day con trainingType 'Tren superior' y 6 exercises.
-// expectLater → goldens/hero_card_<theme>.png
-```
-
-- [ ] **Step 3: Generate & verify**
-
-Run: `flutter test test/features/training/next_training_hero_card_preview_test.dart --update-goldens`
-Expected: PASS; abrir `hero_card_dark.png` → badge verde, título del día, meta, botón verde "Entrenar →".
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add lib/features/training/presentation/widgets/next_training_hero_card.dart test/features/training/next_training_hero_card_preview_test.dart test/features/training/goldens/hero_card_*.png
-git commit -m "feat(entreno): card heroe del siguiente entreno sobre imagen del programa"
-```
-
----
-
-### Task 9: Integración en MainEntrenoScreen
-
-**Files:**
-- Modify: `lib/features/training/presentation/screens/main_entreno_screen.dart:206-275` (`_ProgramsTab`)
-- Test: manual en simulador (ver Task 10) + análisis estático.
-
-**Interfaces:**
-- Consumes: `ProgramHeaderRow` (Task 7), `WeeklyProgressBar` (Task 3), `NextTrainingHeroCard` (Task 8), `selectedCurrentWeekProvider` (Task 1), `selectedNextTrainingDayWithWeekProvider`, `selectedSubscriptionProvider`.
-- Produces: `_ProgramsTab` renderiza header → weekly progress → hero card → `_PreviousRecordsSection`.
-
-- [ ] **Step 1: Editar `_ProgramsTab.build`** — reemplazar el bloque `ActiveProgramsSection(...)` (L237–240) y `_NextTrainingSection` (L259) por la nueva composición. Conservar el branch `isSelectedCompleted → ProgramCompletedCard`.
-
-Reemplazar el `Column(children: [...])` interno (L231–270) por:
+- [ ] **Step 1: Reemplazar el contenido del `Column` de `_ProgramsTab`** (L231–270). Quitar `ActiveProgramsSection` y `_NextTrainingSection`. Conservar el branch `isSelectedCompleted → ProgramCompletedCard` y `_PreviousRecordsSection`.
 
 ```dart
         child: Column(
@@ -1011,29 +1184,35 @@ Reemplazar el `Column(children: [...])` interno (L231–270) por:
             const SizedBox(height: AppSpacing.s16),
 
             if (content.subscriptions.isNotEmpty) ...[
-              // Header: título-programa (dropdown) + kebab de gestión
+              // 1. Header: "Masa magra - 4 días ▾"  +  ⋮
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
                 child: ProgramHeaderRow(subscriptions: content.subscriptions),
               ),
-              const SizedBox(height: AppSpacing.s12),
+              const SizedBox(height: AppSpacing.s16),
 
-              // Progreso semanal
+              // 2. Progreso de la semana del programa (3 estados)
               Consumer(builder: (context, ref, _) {
                 final week = ref.watch(selectedCurrentWeekProvider);
+                final dayIndex = ref.watch(selectedDayIndexProvider);
                 if (week == null || week.totalDays == 0) {
                   return const SizedBox.shrink();
                 }
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-                  child: WeeklyProgressBar(week: week),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+                  child: WeeklyProgressBar(
+                    week: week,
+                    selectedDayIndex: dayIndex,
+                  ),
                 );
               }),
               const SizedBox(height: AppSpacing.s16),
 
               if (isSelectedCompleted) ...[
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
                   child: ProgramCompletedCard(
                     subscriptionId: selectedSubscription!.id,
                     programId: selectedSubscription.programId,
@@ -1042,33 +1221,12 @@ Reemplazar el `Column(children: [...])` interno (L231–270) por:
                   ),
                 ),
               ] else ...[
-                // Card héroe = siguiente entreno
-                Consumer(builder: (context, ref, _) {
-                  final sub = ref.watch(selectedSubscriptionProvider);
-                  final nextInfo = ref.watch(selectedNextTrainingDayWithWeekProvider);
-                  if (sub == null || nextInfo == null) {
-                    return const NoNextTrainingCard();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-                    child: NextTrainingHeroCard(
-                      subscription: sub,
-                      trainingDay: nextInfo.day,
-                      onStartTraining: () {
-                        context.push(AppRoutes.trainingDay, extra: {
-                          'trainingDay': nextInfo.day,
-                          'totalDaysInWeek': nextInfo.totalDaysInWeek,
-                          'subscriptionId': sub.id,
-                          'weekNumber': nextInfo.weekNumber,
-                        });
-                      },
-                    ),
-                  );
-                }),
+                // 3. Carrusel de los días de la semana (cards sin botón)
+                const WeekDaysPager(),
 
                 const SizedBox(height: AppSpacing.s24),
 
-                // Tus marcas (sin cambios)
+                // 4. Tus marcas (sin cambios)
                 _PreviousRecordsSection(ref: ref),
               ],
             ],
@@ -1078,98 +1236,80 @@ Reemplazar el `Column(children: [...])` interno (L231–270) por:
         ),
 ```
 
-Añadir imports al principio del archivo:
+Añadir imports:
 ```dart
+import '../providers/current_week_provider.dart';
 import '../widgets/program_header_row.dart';
 import '../widgets/weekly_progress_bar.dart';
-import '../widgets/next_training_hero_card.dart';
-import '../providers/current_week_provider.dart';
+import '../widgets/week_days_pager.dart';
 ```
-Retirar los imports/usos de `ActiveProgramsSection` y `NextTrainingCard` si quedan sin usar (dejar `NoNextTrainingCard` que sigue usándose). `flutter analyze` avisará de imports sin uso.
+Quitar los imports de `active_programs_section.dart` y `next_training_card.dart` si quedan sin uso (`flutter analyze` lo dirá). **Conservar** `_NextTrainingSection` solo si algo más lo usa; si no, borrarlo del archivo.
 
-- [ ] **Step 2: Análisis estático**
-
-Run: `cd /Users/kataiturriaga/repos/elmetodo_app && flutter analyze lib/features/training/presentation/screens/main_entreno_screen.dart`
-Expected: `No issues found!` (corregir imports sin usar si los marca).
-
-- [ ] **Step 3: Verificar que compila el árbol de training**
+- [ ] **Step 2: Analizar**
 
 Run: `flutter analyze lib/features/training`
-Expected: sin errores.
+Expected: `No issues found!`
+
+- [ ] **Step 3: Toda la batería de tests**
+
+Run: `flutter test test/features/training/`
+Expected: todo PASS.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add lib/features/training/presentation/screens/main_entreno_screen.dart
-git commit -m "feat(entreno): integrar header + progreso semanal + card heroe en la pantalla"
+git commit -m "feat(entreno): integrar header, progreso semanal y carrusel de dias"
 ```
 
 ---
 
-### Task 10: Verificación visual en simulador
+### Task 11: Verificación en el simulador
 
-**Files:** ninguno (verificación).
+- [ ] **Step 1: Arrancar**
 
-- [ ] **Step 1: Lanzar la app en el simulador contra dev**
+`flutter run -d <sim-id> --dart-define=APP_ENV=development`
+Usuario con programas: `ana.garcia.test@mailinator.com` / `Test1234!` (10 subscripciones). Ir al tab Entreno.
 
-Run (background): `cd /Users/kataiturriaga/repos/elmetodo_app && flutter run -d <sim-id> --dart-define=APP_ENV=development`
+- [ ] **Step 2: Checklist visual**
+  - [ ] El tab "Entreno / Seguimiento" sigue arriba, intacto.
+  - [ ] Título **"Masa magra - 4 días ▾"** a la izquierda; **⋮** a la derecha.
+  - [ ] Tocar el título → lista de programas (✓ en el activo) + "＋ Añadir programa". Cambiar de programa actualiza la barra y el carrusel.
+  - [ ] Tocar ⋮ → **Ver programa** (lleva a la estructura del programa con semanas) y **Terminar programa** (pide confirmación; conserva el progreso).
+  - [ ] Barra: casillas verdes (hechas), gris claro (la que ves), gris oscuro (pendientes). Texto **"Semana N · X de N entrenos"**.
+  - [ ] Card **sin botón**, con la foto del programa. Tag correcto: PRÓXIMO ENTRENO / COMPLETADO / **EN CURSO (naranja)** / sin tag.
+  - [ ] **Deslizar** la card cambia de día dentro de la semana; los **dots** se mueven; la barra marca en gris claro el día que ves.
+  - [ ] Tocar la card (en cualquier estado) abre el entreno. En un día completado, las series salen **rellenadas** y se pueden sobreescribir.
+  - [ ] "Tus marcas" sigue debajo, intacto.
 
-- [ ] **Step 2: Iniciar sesión con un usuario dev con ≥1 programa activo**
-
-Usuario de prueba con programas: `ana.garcia.test@mailinator.com` / `Test1234!` (tiene 10 subscripciones — ver memoria `reference_db_prod`). Navegar al tab Entreno.
-
-- [ ] **Step 3: Checklist visual**
-  - [ ] El tab "Entreno / Seguimiento" sigue arriba.
-  - [ ] Debajo, el título del programa "Nombre - N días ▾" a la izquierda; ⋮ a la derecha.
-  - [ ] Tocar el título abre el menú con las subscripciones + "＋ Añadir programa"; cambiar de programa actualiza la card.
-  - [ ] Tocar ⋮ muestra Ver / Reemplazar / Terminar; "Terminar" pide confirmación y conserva historial.
-  - [ ] Barra de progreso + **"Semana N · X de N entrenos"** con el conteo correcto de la semana **del programa** (no del calendario).
-  - [ ] Card héroe con imagen del programa + "PRÓXIMO ENTRENO" + día + botón verde "Entrenar →"; el botón navega a la sesión.
-  - [ ] "Tus marcas" intacto debajo.
-
-- [ ] **Step 4: Capturar pantalla y adjuntar al caso de estudio**
-
-`xcrun simctl io <sim-id> screenshot <ruta>` y guardar referencia en `casos-de-estudio/entreno-arquitectura-dos-cards.md` §G.
+- [ ] **Step 3: Captura** y adjuntar al caso de estudio (`casos-de-estudio/entreno-arquitectura-dos-cards.md` §G).
 
 ---
 
-## FASE 2 — Scroll horizontal entre días de la semana (posterior, opcional)
+## Pendiente en Figma (no bloquea el código)
 
-> **Decisión de diseño pendiente de validar con usuarios** (documentada en el caso de estudio §G): al deslizar la card a otro día de la semana, ¿el botón "Entrenar" cambia a ese día? ¿Los días completados muestran estado "Completado" + opción repetir? Riesgo principal: **descubribilidad del gesto** (necesita peek del día siguiente + dots).
+1. **`message/warning` en modo Light está en blanco** (`#FFFFFF`) — es un bug del design system. En el código ya está corregido (naranja en ambos temas).
+2. **`NextWorkoutCard` no tiene la variante "EN CURSO"** (naranja). El código ya la implementa; convendría añadirla al componente.
+3. Typo menor: la variante se llama `NextSesion` (una sola "s").
 
-**Esbozo (no desglosado en pasos hasta validar):**
-- Convertir la card héroe en un `PageView` sobre `selectedCurrentWeekProvider.days`, con `PageController(initialPage: indexOf(nextTrainingDay))`.
-- Añadir **affordance**: dots debajo (uno por día, verde=completado, resaltado=actual) y/o peek del borde del día siguiente.
-- Estado por día: pendiente → botón "Entrenar"; completado → estado "Completado ✓" + acción secundaria "Repetir".
-- Golden tests por estado (pendiente/completado, primer/último día).
+## Riesgo conocido (aceptado, no se resuelve aquí)
 
----
+**Si el usuario se salta un día**, la card le seguirá proponiendo ese día como "próximo entreno" y la barra se quedará anclada en esa semana, aunque él siga entrenando por "Ver programa". **No está bloqueado** (puede entrenar cualquier día desde ahí), pero la pantalla principal muestra información desfasada. Un botón de "saltar entreno" requeriría backend (el sistema solo conoce "hecho"/"no hecho") y **queda fuera de alcance por decisión de producto**. Workaround para el usuario: marcar el entreno como completado.
 
 ## Self-Review
 
-**Cobertura del spec (decisión de Kata + maqueta):**
-- Título-programa con dropdown ✅ Task 4 + 7. "Añadir programa" ✅ (onAddProgram → catálogo).
-- Menú ⋮ Ver / Reemplazar / Terminar ✅ Task 6 + 7. Confirmación destructiva ✅ Task 5.
-- Progreso de la semana **del programa** "Semana 1 · 0 de 6 entrenos" ✅ Task 1 + 3 (semántica verificada en front y API: no hay semana natural).
-- Card héroe única = siguiente entreno sobre imagen, botón verde ✅ Task 8.
-- Tab bar conservado, "Tus marcas" conservado ✅ Task 9.
-- Scroll de días ✅ diferido a Fase 2 (documentado).
+**Cobertura:** header con dropdown ✅ T6+T9 · menú ⋮ (Ver/Terminar) ✅ T8+T9 · confirmación destructiva ✅ T7 · barra 3 estados ✅ T1+T3 · card sin botón con 4 tags ✅ T4 · carrusel de días de la semana + dots ✅ T5 · integración ✅ T10 · tab bar y "Tus marcas" intactos ✅ T10.
 
-**Type consistency:** `selectedCurrentWeekProvider` (`TrainingWeek?`) usado igual en Task 3/9. `ProgramSelectorButton`/`ProgramActionsMenu`/`NextTrainingHeroCard`/`ProgramHeaderRow` firmas idénticas entre su definición y su uso en Task 7/9. `showEndProgramDialog(context:, programName:) → Future<bool>` usado consistente en Task 7. `archiveProgram(id, {keepProgress=true})` conserva progreso (default) — coherente con "Terminar" no destructivo.
+**Consistencia de tipos:** `selectedCurrentWeekProvider` (`TrainingWeek?`), `selectedDayIndexProvider` (`int`) e `initialDayIndexProvider` (`int`) se usan igual en T3/T5/T10. `WorkoutCardState` + `workoutCardStateFor(day, isNext:)` definidos en T4 y consumidos en T5. `showEndProgramDialog(context:, programName:) → Future<bool>` definido en T7 y usado en T9.
 
-**Placeholders:** los tests de Task 5/6/7 describen el escenario en comentario en vez de código completo (widget tests de interacción); el implementador debe escribir el `tester.tap`/`expect` siguiendo el patrón de `marcas_section_test.dart`. Los constructores de fixtures (`SubscriptionDetail`, `TrainingWeek`) deben verificarse contra `domain/entities/subscription_detail.dart` (parámetros `required` reales) — señalado en Task 1.
+**Verificado contra datos reales (API dev):** "Masa magra" tiene **4 días/semana**; los días se llaman "Tren superior", "Pierna + Core", "Fullbody"; tienen 7/5/5/4 ejercicios. El campo `training_type` contiene listas largas de músculos → **no se muestra**. La duración **no existe** → no se muestra.
 
-**Riesgos abiertos:**
-1. Constructores exactos de las entidades de dominio (verificar `required` reales antes de escribir fixtures).
-2. `AppSpacing.radiusMedium` / `AppSpacing.s12` — confirmar que existen (si no, usar `s8`/`s16`).
-3. `withValues(alpha:)` vs `withOpacity` según versión de Flutter del repo.
-4. Firma de `AppButton` (props exactas).
+**A verificar al implementar:** parámetros `required` reales de las entidades de dominio (fixtures de test); firma exacta de `AppButton`; `withValues(alpha:)` vs `withOpacity` según la versión de Flutter.
 
----
+## Materiales
 
-## Materiales de referencia
-
-- Caso de estudio: `casos-de-estudio/entreno-arquitectura-dos-cards.md` (§G = decisión final).
-- Prototipos: `entreno-una-card.html`, `entreno-selector-programa.html` (opción 2 elegida).
-- Informe API (endpoints, gaps): resumen en el caso de estudio — sin backend nuevo para Fase 1.
-- Rama: `ux/entreno-card-siguiente-v-b` (ya con `next_training_card.dart` verde + golden).
+- Caso de estudio: `casos-de-estudio/entreno-arquitectura-dos-cards.md`
+- Figma: `NextWorkoutCard` node `1275:3358` (EMP DS - Library, `LOFKz4g6bswukPAJfWR0Ts`)
+- Prototipos: `entreno-una-card.html`, `entreno-selector-programa.html` (opción 2 elegida)
+- Estados y datos: `entreno-estados-datos.html`
+- Rama: `ux/entreno-card-siguiente-v-b`
